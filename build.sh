@@ -18,12 +18,12 @@ fi
 # Activate the virtual environment
 pyenv activate venv-3.11.5
 
-# Poetry should now be installed and configured; include the correct installation path
+# Include Poetry installation path in the PATH
 export PATH="$HOME/.local/bin:$PATH"
 
 # Verify that Poetry is available
 if ! command -v poetry &> /dev/null; then
-    echo "Error: Poetry is not found in PATH, install it or check your environment setup."
+    echo "Error: Poetry is not found in PATH. Install it or check your environment setup."
     exit 1
 fi
 
@@ -72,12 +72,9 @@ mkdir -p build/64All/lib
 # Copy the library to the build lib directory
 cp "$LIB_PYTHON_PATH" build/64All/lib
 
-# Generate the spec file
+# Generate the spec file for PyInstaller
 echo "Creating spec file..."
-poetry run pyinstaller --name 64All --onefile main.py
-
-# Modify the spec file to include hidden imports and ensure ttkthemes is explicitly listed
-cat > 64All.spec << 'EOL'
+echo "
 # -*- mode: python ; coding: utf-8 -*-
 
 block_cipher = None
@@ -121,7 +118,7 @@ coll = COLLECT(
     upx=True,
     name='64All'
 )
-EOL
+" > 64All.spec
 
 # Create the executable
 echo "Creating the executable..."
