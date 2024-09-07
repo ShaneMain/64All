@@ -18,12 +18,12 @@ fi
 # Activate the virtual environment
 pyenv activate venv-3.11.5
 
-# Poetry should now be installed and configured; include the correct installation path
+# Include Poetry installation path in the PATH
 export PATH="$HOME/.local/bin:$PATH"
 
 # Verify that Poetry is available
 if ! command -v poetry &> /dev/null; then
-    echo "Error: Poetry is not found in PATH, install it or check your environment setup."
+    echo "Error: Poetry is not found in PATH. Install it or check your environment setup."
     exit 1
 fi
 
@@ -67,25 +67,21 @@ echo "LD_LIBRARY_PATH set to $LD_LIBRARY_PATH"
 rm -rf build dist 64All.spec
 
 # Create a lib directory within the build structure
-mkdir -p build/64All/lib
+mkdir -p build/64All/_internal
 
-# Copy the library to the build lib directory
-cp "$LIB_PYTHON_PATH" build/64All/lib
+# Copy the library to the build _internal directory
+cp "$LIB_PYTHON_PATH" build/64All/_internal
 
-# Generate the spec file
+# Generate the spec file for PyInstaller
 echo "Creating spec file..."
-poetry run pyinstaller --name 64All --onefile main.py
-
-# Modify the spec file to include hidden imports and ensure ttkthemes is explicitly listed
-cat > 64All.spec << 'EOL'
+cat << EOF > 64All.spec
 # -*- mode: python ; coding: utf-8 -*-
-
 block_cipher = None
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[('build/64All/lib/libpython3.11.so.1.0', './lib')],
+    binaries=[('build/64All/_internal/libpython3.11.so.1.0', './_internal')],
     datas=[],
     hiddenimports=['ttkthemes', 'theme_setter', 'gitlogic'],
     hookspath=[],
@@ -121,7 +117,7 @@ coll = COLLECT(
     upx=True,
     name='64All'
 )
-EOL
+EOF
 
 # Create the executable
 echo "Creating the executable..."
