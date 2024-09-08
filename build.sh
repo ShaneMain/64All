@@ -38,9 +38,10 @@ poetry install
 
 # Get the prefix directory
 PYTHON_PREFIX=$(pyenv prefix 3.11.5)
+PYTHON_VERSION="3.11.5"
 echo "Python Prefix: $PYTHON_PREFIX"
 
-# Directly assign the library path
+# Define the library path
 LIB_PYTHON_PATH="$PYTHON_PREFIX/lib/libpython3.11.so.1.0"
 echo "Library Path: $LIB_PYTHON_PATH"
 
@@ -59,46 +60,57 @@ fi
 
 echo "Library found at $LIB_PYTHON_PATH"
 
-# Set LD_LIBRARY_PATH for the current session
-export LD_LIBRARY_PATH=$(dirname "$LIB_PYTHON_PATH")
-echo "LD_LIBRARY_PATH set to $LD_LIBRARY_PATH"
-
 # Clean previous builds
 rm -rf build dist 64All.spec
 
 # Create a lib directory within the build structure
-mkdir -p build/64All/_internal
+mkdir -p build/64All/lib
 
-# Copy the library to the build _internal directory
-cp "$LIB_PYTHON_PATH" build/64All/_internal
+# Copy the library to the build lib directory
+cp "$LIB_PYTHON_PATH" build/64All/lib
 
 # Generate the spec file for PyInstaller
 echo "Creating spec file..."
 cat << EOF > 64All.spec
+# Refined Spec file to manually include python encodings directory if needed
 # -*- mode: python ; coding: utf-8 -*-
+import os
+import sys
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+
 block_cipher = None
 
+# Collect all hidden imports from encodings
+hiddenimports = collect_submodules('encodings')
+
+# Manually specify data files
+encodings_path = os.path.join(sys.base_prefix, 'lib/python3.11/encodings')
+datas = collect_data_files('encodings', include_py_files=True) + [
+    (encodings_path, 'encodings')
+]
+
 a = Analysis(
-    ['main.py'],
-    pathex=[],
-    binaries=[('build/64All/_internal/libpython3.11.so.1.0', './_internal')],
-    datas=[],
-    hiddenimports=['ttkthemes', 'theme_setter', 'gitlogic'],
+    ['main.py'],  # Ensure 'main.py' is your entry script
+    pathex=['.'],
+    binaries=[
+        ('build/64All/lib/libpython3.11.so.1.0', 'lib/libpython3.11.so.1.0')
+    ],
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
-    hooksconfig={},
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
-    noarchive=False
+    noarchive=True
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    [],
-    exclude_binaries=True,
+    a.binaries,
+    exclude_binaries=False,
     name='64All',
     debug=False,
     bootloader_ignore_signals=False,
@@ -106,16 +118,8 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    name='64All'
+    console=True,
+    onefile=True
 )
 EOF
 
@@ -123,10 +127,15 @@ EOF
 echo "Creating the executable..."
 poetry run pyinstaller 64All.spec
 
-# Ensure the shared library is included properly in the dist directory
-DIST_DIR="dist/64All"
-LIB_DIR="$DIST_DIR/_internal"
-mkdir -p "$LIB_DIR"
-cp "$LIB_PYTHON_PATH" "$LIB_DIR"
+# Print directory structure for debugging purposes
+echo "Directory structure after build:"
+ls -R
 
-echo "Executable created successfully. Library copied to $LIB_DIR."
+# Verify that the shared library is included properly
+EXECUTABLE_FILE="dist/64All"
+if [ ! -f "$EXECUTABLE_FILE" ]; then
+    echo "Error: $EXECUTABLE_FILE was not found."
+    exit 1
+fi
+
+echo "Executable created successfully at $EXECUTABLE_FILE."

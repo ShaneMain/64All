@@ -6,10 +6,11 @@ authors = ["Your Name <your.email@example.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-gitpython = "^3.1.30"  # As of the latest version
-ttkthemes = "^3.2.2"  # As of the latest version
-Pillow = "^10.0.1"  # Tkinter often needs Pillow for image supp ort
+gitpython = "^3.1.30"
+ttkthemes = "^3.2.2"
+Pillow = "^10.0.1"
 darkdetect = "0.8.0"
+pyyaml = "6.0.2"
 
 [build-system]
 requires = ["poetry-core"]
