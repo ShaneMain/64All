@@ -6,55 +6,66 @@ repos:
         default: "us"
         values: ["us", "eu", "jp", "sh"]
         description: 'Which ROM to use: the selected ROM has to be in the repo folder with the name baserom.$VERSION.z64. eu and jp are currently only supported on the master branch (sh is not supported at all).'
-      advanced:
-        TARGET_BITS:
-          default: ""
-          values: [32, 64]
-          description: 'TARGET_BITS=n appends some compiler flags for an n-bit build. If the value is empty, the option does nothing, assuming your native toolchain will set everything up by itself. Use this only if you are having trouble otherwise.'
-        TARGET_RPI:
-          default: 0
-          values: [0, 1]
-          description: 'Select optimal settings for Raspberry PI hardware. See the main article on that.'
-        TARGET_WEB:
-          default: 0
-          values: [0, 1]
-          description: 'Build Emscripten version. See the main article on that.'
-        WINDOWS_BUILD:
-          default: 0
-          values: [0, 1]
-          description: 'Build for Windows. Usually set automatically if building on Windows.'
-        TARGET_SWITCH:
-          default: 0
-          values: [0, 1]
-          description: 'Build for Switch.'
-        OSX_BUILD:
-          default: 0
-          values: [0, 1]
-          description: 'Build for OSX.'
-        WINDOWS_CONSOLE:
-          default: 0
-          values: [0, 1]
-          description: 'Append -mconsole to Windows CFLAGS, making a console window appear while the game is running. Can be useful for debugging purposes.'
-        DEBUG:
-          default: 0
-          values: [0, 1]
-          description: 'Build with debug symbols and default optimization level. Otherwise build with -O2.'
-        RENDER_API:
-          default: "GL"
-          values: ["GL", "GL_LEGACY", "D3D11", "D3D12"]
-          description: 'Select rendering backend to use. GL corresponds to OpenGL 2.1 (gfx_opengl.c), GL_LEGACY corresponds to OpenGL 1.3 (gfx_opengl_legacy.c). Direct3D backends will also force WINDOW_API to DXGI.'
-        WINDOW_API:
-          default: "SDL2"
-          values: ["SDL1", "SDL2", "DXGI"]
-          description: 'Select windowing backend. GL renderers force SDL1 or SDL2 and D3D renderers force DXGI for now, so you do not need to specify this.'
-        AUDIO_API:
-          default: "SDL2"
-          values: ["SDL1", "SDL2"]
-          description: 'Select audio backend. Keep in mind that you CANNOT mix SDL1 and SDL2.'
-        CONTROLLER_API:
-          default: "SDL2"
-          values: ["SDL2"]
-          description: 'Specify list of controller backends to use. There is only one right now. Keep in mind that you CANNOT mix SDL1 and SDL2.'
+      TARGET_BITS:
+        default: 64
+        values: [32, 64]
+        description: 'TARGET_BITS=n appends some compiler flags for an n-bit build. If the value is empty, the option does nothing, assuming your native toolchain will set everything up by itself. Use this only if you are having trouble otherwise.'
+        advanced: true
+      TARGET_RPI:
+        default: 0
+        values: [0, 1]
+        description: 'Select optimal settings for Raspberry PI hardware. See the main article on that.'
+        advanced: true
+      TARGET_WEB:
+        default: 0
+        values: [0, 1]
+        description: 'Build Emscripten version. See the main article on that.'
+        advanced: true
+      WINDOWS_BUILD:
+        default: 0
+        values: [0, 1]
+        description: 'Build for Windows. Usually set automatically if building on Windows.'
+        advanced: true
+      TARGET_SWITCH:
+        default: 0
+        values: [0, 1]
+        description: 'Build for Switch.'
+        advanced: true
+      OSX_BUILD:
+        default: 0
+        values: [0, 1]
+        description: 'Build for OSX.'
+        advanced: true
+      WINDOWS_CONSOLE:
+        default: 0
+        values: [0, 1]
+        description: 'Append -mconsole to Windows CFLAGS, making a console window appear while the game is running. Can be useful for debugging purposes.'
+        advanced: true
+      DEBUG:
+        default: 0
+        values: [0, 1]
+        description: 'Build with debug symbols and default optimization level. Otherwise build with -O2.'
+        advanced: true
+      RENDER_API:
+        default: "GL"
+        values: ["GL", "GL_LEGACY", "D3D11", "D3D12"]
+        description: 'Select rendering backend to use. GL corresponds to OpenGL 2.1 (gfx_opengl.c), GL_LEGACY corresponds to OpenGL 1.3 (gfx_opengl_legacy.c). Direct3D backends will also force WINDOW_API to DXGI.'
+        advanced: true
+      WINDOW_API:
+        default: "SDL2"
+        values: ["SDL1", "SDL2", "DXGI"]
+        description: 'Select windowing backend. GL renderers force SDL1 or SDL2 and D3D renderers force DXGI for now, so you do not need to specify this.'
+        advanced: true
+      AUDIO_API:
+        default: "SDL2"
+        values: ["SDL1", "SDL2"]
+        description: 'Select audio backend. Keep in mind that you CANNOT mix SDL1 and SDL2.'
+        advanced: true
+      CONTROLLER_API:
+        default: "SDL2"
+        values: ["SDL2"]
+        description: 'Specify list of controller backends to use. There is only one right now. Keep in mind that you CANNOT mix SDL1 and SDL2.'
+        advanced: true
       TEXTURE_FIX:
         default: 0
         values: [0, 1]
@@ -74,55 +85,66 @@ repos:
         default: "us"
         values: ["us", "eu", "jp", "sh"]
         description: 'Which ROM to use: the selected ROM has to be in the repo folder with the name baserom.$VERSION.z64. eu and jp are currently only supported on the master branch (sh is not supported at all).'
-      advanced:
-        TARGET_BITS:
-          default: 32
-          values: [32, 64]
-          description: 'TARGET_BITS=n appends some compiler flags for an n-bit build. If the value is empty, the option does nothing, assuming your native toolchain will set everything up by itself. Use this only if you are having trouble otherwise.'
-        TARGET_RPI:
-          default: 0
-          values: [0, 1]
-          description: 'Select optimal settings for Raspberry PI hardware. See the main article on that.'
-        TARGET_WEB:
-          default: 0
-          values: [0, 1]
-          description: 'Build Emscripten version. See the main article on that.'
-        WINDOWS_BUILD:
-          default: 0
-          values: [0, 1]
-          description: 'Build for Windows. Usually set automatically if building on Windows.'
-        OSX_BUILD:
-          default: 0
-          values: [0, 1]
-          description: 'Build for OSX.'
-        WINDOWS_CONSOLE:
-          default: 0
-          values: [0, 1]
-          description: 'Append -mconsole to Windows CFLAGS, making a console window appear while the game is running. Can be useful for debugging purposes.'
-        DEBUG:
-          default: 0
-          values: [0, 1]
-          description: 'Build with debug symbols and default optimization level. Otherwise build with -O2.'
-        RENDER_API:
-          default: "GL"
-          values: ["GL", "GL_LEGACY", "D3D11", "D3D12"]
-          description: 'Select rendering backend to use. GL corresponds to OpenGL 2.1 (gfx_opengl.c), GL_LEGACY corresponds to OpenGL 1.3 (gfx_opengl_legacy.c). Direct3D backends will also force WINDOW_API to DXGI.'
-        WINDOW_API:
-          default: "SDL2"
-          values: ["SDL1", "SDL2", "DXGI"]
-          description: 'Select windowing backend. GL renderers force SDL1 or SDL2 and D3D renderers force DXGI for now, so you do not need to specify this.'
-        AUDIO_API:
-          default: "SDL2"
-          values: ["SDL1", "SDL2"]
-          description: 'Select audio backend. Keep in mind that you CANNOT mix SDL1 and SDL2.'
-        EXTERNAL_DATA:
-          default: 0
-          values: [0, 1]
-          description: 'Load textures and soundbanks from external files. Allows you to use texture packs. The default data is copied to a res folder next to the produced executable.'
-        TEXTSAVES:
-          default: 0
-          values: [0, 1]
-          description: 'Use INI-based save format instead of binary EEPROM dumps. Experimental.'
+      TARGET_BITS:
+        default: 64
+        values: [32, 64]
+        description: 'TARGET_BITS=n appends some compiler flags for an n-bit build. If the value is empty, the option does nothing, assuming your native toolchain will set everything up by itself. Use this only if you are having trouble otherwise.'
+        advanced: true
+      TARGET_RPI:
+        default: 0
+        values: [0, 1]
+        description: 'Select optimal settings for Raspberry PI hardware. See the main article on that.'
+        advanced: true
+      TARGET_WEB:
+        default: 0
+        values: [0, 1]
+        description: 'Build Emscripten version. See the main article on that.'
+        advanced: true
+      WINDOWS_BUILD:
+        default: 0
+        values: [0, 1]
+        description: 'Build for Windows. Usually set automatically if building on Windows.'
+        advanced: true
+      OSX_BUILD:
+        default: 0
+        values: [0, 1]
+        description: 'Build for OSX.'
+        advanced: true
+      WINDOWS_CONSOLE:
+        default: 0
+        values: [0, 1]
+        description: 'Append -mconsole to Windows CFLAGS, making a console window appear while the game is running. Can be useful for debugging purposes.'
+        advanced: true
+      DEBUG:
+        default: 0
+        values: [0, 1]
+        description: 'Build with debug symbols and default optimization level. Otherwise build with -O2.'
+        advanced: true
+      RENDER_API:
+        default: "GL"
+        values: ["GL", "GL_LEGACY", "D3D11", "D3D12"]
+        description: 'Select rendering backend to use. GL corresponds to OpenGL 2.1 (gfx_opengl.c), GL_LEGACY corresponds to OpenGL 1.3 (gfx_opengl_legacy.c). Direct3D backends will also force WINDOW_API to DXGI.'
+        advanced: true
+      WINDOW_API:
+        default: "SDL2"
+        values: ["SDL1", "SDL2", "DXGI"]
+        description: 'Select windowing backend. GL renderers force SDL1 or SDL2 and D3D renderers force DXGI for now, so you do not need to specify this.'
+        advanced: true
+      AUDIO_API:
+        default: "SDL2"
+        values: ["SDL1", "SDL2"]
+        description: 'Select audio backend. Keep in mind that you CANNOT mix SDL1 and SDL2.'
+        advanced: true
+      EXTERNAL_DATA:
+        default: 0
+        values: [0, 1]
+        description: 'Load textures and soundbanks from external files. Allows you to use texture packs. The default data is copied to a res folder next to the produced executable.'
+        advanced: true
+      TEXTSAVES:
+        default: 0
+        values: [0, 1]
+        description: 'Use INI-based save format instead of binary EEPROM dumps. Experimental.'
+        advanced: true
       BETTERCAMERA:
         default: 1
         values: [0, 1]

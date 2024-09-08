@@ -80,7 +80,10 @@ class GitRepoClonerApp:
         repo = next((repo for repo in self.REPOS if repo['name'] == initial_repo_name), None)
         if repo:
             self.repo_options = repo.get('options', {})
-            self.create_build_option_widgets(self.repo_options, self.tooltip_bg_color, self.tooltip_fg_color)
+            self.create_build_option_widgets(self.repo_options, self.tooltip_bg_color, self.tooltip_fg_color,
+                                             show_advanced=False)
+
+        self.toggle_advanced_options(reset_grid=False)  # Initial call without resetting the grid
 
     def load_repos(self):
         yaml_file = 'repos.yaml'
@@ -136,54 +139,57 @@ class GitRepoClonerApp:
     def update_branch_menu(self, repo_name):
         update_branch_menu(repo_name, self.REPOS, self.branch_var, self.branch_menu)
 
-    def create_build_option_widgets(self, repo_options, bg_color, fg_color, advanced_options=False):
+    def create_build_option_widgets(self, repo_options, bg_color, fg_color, show_advanced):
+        # Clear existing build option widgets
         for widget in self.main_frame.grid_slaves():
             if int(widget.grid_info()["row"]) >= 6:
-                widget.destroy()
+                widget.grid_forget()
 
-        if not advanced_options:
-            advanced_options = repo_options.pop('advanced', {})
+        # Separate standard and advanced options
+        standard_options = {k: v for k, v in repo_options.items() if not v.get('advanced', False)}
+        advanced_options = {k: v for k, v in repo_options.items() if v.get('advanced', False)}
 
-        checkboxes = [(opt_name, opt_info) for opt_name, opt_info in repo_options.items() if
-                      "values" in opt_info and isinstance(opt_info["values"], list) and len(
-                          opt_info["values"]) == 2 and 0 in opt_info["values"]]
-        dropdowns = [(opt_name, opt_info) for opt_name, opt_info in repo_options.items() if
-                     "values" in opt_info and not (
-                             isinstance(opt_info["values"], list) and len(opt_info["values"]) == 2 and 0 in opt_info[
-                         "values"])]
+        row_offset_standard = 6
+        row_offset_advanced = 6
 
-        for i, (opt_name, opt_info) in enumerate(checkboxes):
-            row_offset = 6 + (i // 2)
-            col = (i % 2) * 4
+        # Function to create widgets
+        def create_widgets(options, row_offset, column):
+            for opt_name, opt_info in options.items():
+                if 'values' not in opt_info:
+                    continue
 
-            label = ttk.Label(self.main_frame, text=f"{opt_name}:")
-            label.grid(row=row_offset, column=col, padx=5, pady=3, sticky=tk.E)
-            Tooltip(label, opt_info.get('description', ''), bg_color, fg_color)
+                label = ttk.Label(self.main_frame, text=f"{opt_name}:")
+                label.grid(row=row_offset, column=column * 2, padx=5, pady=3, sticky=tk.E)
+                Tooltip(label, opt_info.get('description', ''), bg_color, fg_color)
 
-            var = tk.IntVar(value=opt_info.get('default', 0))
-            widget = ttk.Checkbutton(self.main_frame, variable=var)
-            widget.grid(row=row_offset, column=col + 1, padx=5, pady=3, sticky=tk.W)
-            Tooltip(widget, opt_info.get('description', ''), bg_color, fg_color)
-            self.build_options_vars[opt_name] = var
+                if isinstance(opt_info['values'], list) and len(opt_info['values']) == 2 and 0 in opt_info['values']:
+                    var = tk.IntVar(value=opt_info.get('default', 0))
+                    widget = ttk.Checkbutton(self.main_frame, variable=var)
+                else:
+                    var = tk.StringVar(value=opt_info.get('default', ''))
+                    values = opt_info.get('values', [])
+                    widget = ttk.OptionMenu(self.main_frame, var, var.get(), *values)
 
-        start_row = 6 + (len(checkboxes) // 2) + 1
+                widget.grid(row=row_offset, column=(column * 2) + 1, padx=5, pady=3, sticky=tk.W)
+                Tooltip(widget, opt_info.get('description', ''), bg_color, fg_color)
+                self.build_options_vars[opt_name] = var
+                row_offset += 1
 
-        for i, (opt_name, opt_info) in enumerate(dropdowns):
-            row_offset = start_row + i
-            label = ttk.Label(self.main_frame, text=f"{opt_name}:")
-            label.grid(row=row_offset, column=8, padx=5, pady=3, sticky=tk.E)
-            Tooltip(label, opt_info.get('description', ''), bg_color, fg_color)
+            return row_offset
 
-            var = tk.StringVar(value=opt_info.get('default', ''))
-            values = opt_info.get('values', [])
-            menu = ttk.OptionMenu(self.main_frame, var, var.get(), *values)
-            menu.grid(row=row_offset, column=9, padx=5, pady=3, sticky=tk.W)
-            Tooltip(menu, opt_info.get('description', ''), bg_color, fg_color)
-            self.build_options_vars[opt_name] = var
+        # Create widgets for standard and advanced options
+        row_offset_standard = create_widgets(standard_options, row_offset_standard, column=0)
+        if show_advanced:
+            row_offset_advanced = create_widgets(advanced_options, row_offset_advanced, column=1)
 
-        last_row = start_row + len(dropdowns)
-        if hasattr(self, 'advanced_checkbox') and self.advanced_checkbox:
-            self.advanced_checkbox.grid(row=last_row, column=0, padx=5, pady=3, sticky=tk.W)
+            # Sort checkboxes at the bottom of both columns
+            row_offset_standard = max(row_offset_standard, row_offset_advanced)
+            row_offset_advanced = row_offset_standard
+
+        self.update_advanced_checkbox(row_offset_standard)
+
+    def update_advanced_checkbox(self, row):
+        self.advanced_checkbox.grid(row=row, column=0, padx=5, pady=3, sticky=tk.W)
 
     def toggle_advanced_options(self, reset_grid=True):
         if reset_grid:
@@ -192,16 +198,12 @@ class GitRepoClonerApp:
             if repo:
                 self.repo_options = repo.get('options', {})
 
-        if self.show_advanced_var.get() == 1:
-            self.branch_label.grid()
-            self.branch_menu.grid()
-        else:
-            self.branch_label.grid_remove()
-            self.branch_menu.grid_remove()
+        show_advanced = self.show_advanced_var.get() == 1
+        self.branch_label.grid() if show_advanced else self.branch_label.grid_remove()
+        self.branch_menu.grid() if show_advanced else self.branch_menu.grid_remove()
 
-        if hasattr(self, 'advanced_checkbox') and self.advanced_checkbox:
-            self.create_build_option_widgets(self.repo_options, self.tooltip_bg_color, self.tooltip_fg_color,
-                                             self.show_advanced_var.get() == 1)
+        self.create_build_option_widgets(self.repo_options, self.tooltip_bg_color, self.tooltip_fg_color,
+                                         show_advanced=show_advanced)
 
     def on_repo_selection(self, event):
         try:
@@ -213,10 +215,9 @@ class GitRepoClonerApp:
 
             repo = next((repo for repo in self.REPOS if repo['name'] == repo_name), None)
             if repo:
-                options = repo.get('options', {})
-                self.repo_options = options
-                self.create_build_option_widgets(options, self.tooltip_bg_color, self.tooltip_fg_color,
-                                                 self.show_advanced_var.get() == 1)
+                self.repo_options = repo.get('options', {})
+                self.create_build_option_widgets(self.repo_options, self.tooltip_bg_color, self.tooltip_fg_color,
+                                                 show_advanced=self.show_advanced_var.get() == 1)
         except Exception as error:
             print(f"Error in on_repo_selection: {error}")
 
