@@ -54,10 +54,12 @@ def on_repo_selection(event):
         clone_dir_entry.insert(0, default_dir)
         update_branch_menu(repo_name, REPOS, branch_var, branch_menu)
 
+        # Destroy previous build option widgets
+        for widget in main_frame.grid_slaves():
+            if int(widget.grid_info()["row"]) >= 6:
+                widget.destroy()
+
         if repo_name in sm64ex_repo_names:
-            for widget in main_frame.grid_slaves():
-                if int(widget.grid_info()["row"]) >= 6:
-                    widget.grid_forget()
 
             repo = next(repo for repo in REPOS if repo['name'] == repo_name)
             options = repo.get('options', {})
@@ -82,6 +84,8 @@ def init_window():
     root = ThemedTk(theme="equilux")  # Explicitly set a dark theme to minimize white outline
     set_theme(root)  # Apply theme using the function from theme_setter
     root.title("Git Repo Cloner")
+    # Prevent window resizing
+    root.resizable(width=False, height=False)
     # Remove padding around the main window
     root.configure(padx=0, pady=0)
     yaml_file = 'repos.yaml'
@@ -96,7 +100,7 @@ def init_window():
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
     # Configure main_frame columns for even spacing
-    for i in range(10):  # Assuming up to 5 pairs of checkbox and with existing columns
+    for i in range(10):  # Assuming up to 5 pairs of checkboxes and dropdowns with existing columns
         main_frame.columnconfigure(i, weight=1)
     ttk.Label(main_frame, text="Repository URL:").grid(row=0, column=0, columnspan=2, padx=5, pady=3, sticky=tk.W)
     repo_url_combobox = ttk.Combobox(main_frame, values=repo_names, width=47)
