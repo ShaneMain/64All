@@ -26,7 +26,6 @@ jobs:
         run: |
           dnf update -y
           dnf install -y curl git make gcc bzip2 zlib-devel openssl-devel readline-devel sqlite-devel tk-devel file
-
       - name: Install pyenv and Dependencies
         run: |
           curl https://pyenv.run | bash
@@ -34,34 +33,29 @@ jobs:
           echo 'eval "$(pyenv init --path)"' >> ~/.bashrc
           echo 'eval "$(pyenv init -)"' >> ~/.bashrc
           echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
-
       - name: Install Python and Virtualenv
         shell: bash
         run: |
           source ~/.bashrc
           pyenv install 3.11.5
           pyenv virtualenv 3.11.5 venv-3.11.5
-
       - name: Set up Poetry
         shell: bash
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-
       - name: Install dependencies using Poetry
         shell: bash
         run: |
           source ~/.bashrc
           pyenv activate venv-3.11.5
           poetry install --no-root
-
       - name: Install PyInstaller
         shell: bash
         run: |
           source ~/.bashrc
           pyenv activate venv-3.11.5
           pip install pyinstaller
-
       - name: Run build script
         shell: bash
         run: |
@@ -69,22 +63,21 @@ jobs:
           pyenv activate venv-3.11.5
           chmod +x ./build.sh
           ./build.sh
-
-      - name: Sanitize branch name
-        id: sanitize
+      - name: Generate unique tag
+        id: generate_tag
         run: |
-          BRANCH_NAME=$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-')
-          echo "ARTIFACT_NAME=build-${BRANCH_NAME}" >> $GITHUB_ENV
-
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          TAG_NAME="${GITHUB_REF_NAME}-${TIMESTAMP}"
+          echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_ENV
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          body: Automated release for ${{ github.ref_name }}
+          tag_name: ${{ env.TAG_NAME }}
+          release_name: Release ${{ env.TAG_NAME }}
+          body: Automated release for ${{ env.TAG_NAME }}
           draft: false
           prerelease: false
 
@@ -94,6 +87,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/64All/64All
+          asset_path: ./dist/
           asset_name: 64All
           asset_content_type: application/octet-stream
