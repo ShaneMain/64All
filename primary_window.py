@@ -1,13 +1,26 @@
-import sys
 import os
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QComboBox, QProgressBar, QTextEdit
-from PyQt6.QtWidgets import QPushButton, QCheckBox, QLineEdit, QFileDialog, QWidget, QGridLayout, QVBoxLayout, \
-    QScrollArea, QMessageBox
+import sys
+
+from PyQt6.QtCore import Qt, QThread
+from PyQt6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QLabel,
+    QComboBox,
+    QProgressBar,
+    QTextEdit,
+    QPushButton,
+    QCheckBox,
+    QLineEdit,
+    QFileDialog,
+    QWidget,
+    QGridLayout,
+    QVBoxLayout,
+    QScrollArea,
+)
 from yaml import dump, safe_load
+
 from gitlogic import update_branch_menu, CloneWorker
-from PyQt6.QtCore import QThread
-from PyQt6.QtWidgets import QMainWindow, QComboBox, QVBoxLayout, QTextEdit, QPushButton, QLineEdit, QProgressBar, QLabel
 
 
 class Mario64All(QMainWindow):
@@ -47,11 +60,11 @@ class Mario64All(QMainWindow):
         self.setup_ui()
 
     def load_repos(self):
-        yaml_file = 'repos.yaml'
+        yaml_file = "repos.yaml"
         try:
-            with open(yaml_file, 'r') as file:
+            with open(yaml_file, "r") as file:
                 data = safe_load(file)
-                self.REPOS = data.get('repos', [])
+                self.REPOS = data.get("repos", [])
                 self.populate_repo_urls()
         except Exception as error:
             print(f"Error loading YAML file: {error}")
@@ -59,7 +72,7 @@ class Mario64All(QMainWindow):
     def populate_repo_urls(self):
         self.repo_url_combobox.clear()
         for repo in self.REPOS:
-            self.repo_url_combobox.addItem(repo['name'])
+            self.repo_url_combobox.addItem(repo["name"])
 
     def setup_ui(self):
         self.load_repos()
@@ -89,14 +102,16 @@ class Mario64All(QMainWindow):
     def on_repo_selection(self):
         repo_name = self.repo_url_combobox.currentText()
 
-        self.repo_url = next((repo['url'] for repo in self.REPOS if repo['name'] == repo_name), None)
+        self.repo_url = next(
+            (repo["url"] for repo in self.REPOS if repo["name"] == repo_name), None
+        )
 
         default_dir = os.path.abspath(f"./{repo_name}")
         self.clone_dir_entry.setText(default_dir)
-        repo = next((repo for repo in self.REPOS if repo['name'] == repo_name), None)
+        repo = next((repo for repo in self.REPOS if repo["name"] == repo_name), None)
         if repo:
             update_branch_menu(repo_name, self.REPOS, self.branch_menu)
-            self.repo_options = repo.get('options', {})
+            self.repo_options = repo.get("options", {})
             self.update_build_options(self.repo_options)
 
     def update_build_options(self, repo_options):
@@ -106,8 +121,8 @@ class Mario64All(QMainWindow):
                 self.options_layout.removeWidget(widget)
                 widget.setParent(None)
 
-        basic_options = {k: v for k, v in repo_options.items() if not v.get('advanced')}
-        advanced_options = {k: v for k, v in repo_options.items() if v.get('advanced')}
+        basic_options = {k: v for k, v in repo_options.items() if not v.get("advanced")}
+        advanced_options = {k: v for k, v in repo_options.items() if v.get("advanced")}
 
         self.add_options_to_layout(basic_options)
 
@@ -116,26 +131,38 @@ class Mario64All(QMainWindow):
 
     def add_options_to_layout(self, options):
         for opt_name, opt_info in options.items():
-            if 'values' not in opt_info:
+            if "values" not in opt_info:
                 continue
 
             label = QLabel(f"{opt_name}:")
             self.options_layout.addWidget(label)
 
-            if isinstance(opt_info['values'], list) and len(opt_info['values']) == 2 and 0 in opt_info['values']:
+            if (
+                isinstance(opt_info["values"], list)
+                and len(opt_info["values"]) == 2
+                and 0 in opt_info["values"]
+            ):
                 checkbox = QCheckBox(self)
-                checkbox.setCheckState(Qt.CheckState.Checked if opt_info.get('default', 0) else Qt.CheckState.Unchecked)
+                checkbox.setCheckState(
+                    Qt.CheckState.Checked
+                    if opt_info.get("default", 0)
+                    else Qt.CheckState.Unchecked
+                )
                 checkbox.stateChanged.connect(self.create_checkbox_handler(opt_name))
                 self.options_layout.addWidget(checkbox)
             else:
                 combobox = QComboBox(self)
-                combobox.addItems([str(value) for value in opt_info['values']])
-                combobox.setCurrentText(str(opt_info.get('default', '')))
-                combobox.currentTextChanged.connect(self.create_combobox_handler(opt_name))
+                combobox.addItems([str(value) for value in opt_info["values"]])
+                combobox.setCurrentText(str(opt_info.get("default", "")))
+                combobox.currentTextChanged.connect(
+                    self.create_combobox_handler(opt_name)
+                )
                 self.options_layout.addWidget(combobox)
 
     def create_checkbox_handler(self, opt_name):
-        return lambda state: self.user_selections.update({opt_name: state == Qt.CheckState.Checked})
+        return lambda state: self.user_selections.update(
+            {opt_name: state == Qt.CheckState.Checked}
+        )
 
     def create_combobox_handler(self, opt_name):
         return lambda text: self.user_selections.update({opt_name: text})
@@ -154,16 +181,19 @@ class Mario64All(QMainWindow):
     def cloning_finished(self):
         self.output_text.append("Cloning finished!")
 
+    def update_progress_bar(self, value):
+        self.progress_bar.setValue(value)
+
     def start_cloning(self):
         clone_dir = self.clone_dir_entry.text()
         branch = self.branch_menu.currentText()
-
 
         self.worker = CloneWorker(self.repo_url, clone_dir, branch)
         self.thread = QThread()
         self.worker.moveToThread(self.thread)
 
-        self.worker.progress_signal.connect(self.update_output_text)
+        self.worker.progress_signal.connect(self.update_progress_bar)
+        self.worker.text_signal.connect(self.update_output_text)
         self.worker.finished_signal.connect(self.cloning_finished)
 
         self.thread.started.connect(self.worker.run)
@@ -171,7 +201,12 @@ class Mario64All(QMainWindow):
         self.worker.finished_signal.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
 
+        print("Starting cloning process...")
         self.thread.start()
+
+    def update_progress_bar(self, value):
+        print(f"Updating progress bar: {value}")
+        self.progress_bar.setValue(value)
 
     def on_clone_finished(self):
         self.dump_user_selections()
@@ -181,8 +216,8 @@ class Mario64All(QMainWindow):
             clone_directory = self.clone_dir_entry.text()
             os.makedirs(clone_directory, exist_ok=True)
 
-            selections_file = os.path.join(clone_directory, 'user_selections.yaml')
-            with open(selections_file, 'w') as file:
+            selections_file = os.path.join(clone_directory, "user_selections.yaml")
+            with open(selections_file, "w") as file:
                 dump(self.user_selections, file)
             self.output_text.append(f"User selections saved to {selections_file}.")
         except Exception as error:
