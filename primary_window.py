@@ -16,7 +16,8 @@ from PyQt6.QtWidgets import (
     QWidget,
     QGridLayout,
     QVBoxLayout,
-    QScrollArea,
+    QHBoxLayout,
+    QSizePolicy,
 )
 from yaml import dump, safe_load
 
@@ -31,7 +32,11 @@ class Mario64All(QMainWindow):
         self.setFixedSize(700, 600)
 
         self.main_widget = QWidget()
-        self.main_layout = QGridLayout(self.main_widget)
+        self.main_layout = QVBoxLayout(self.main_widget)  # Use QVBoxLayout
+        self.main_layout.setSpacing(5)  # Set the spacing between elements
+        self.main_layout.setContentsMargins(
+            10, 10, 10, 10
+        )  # Set margins around the layout
         self.setCentralWidget(self.main_widget)
 
         self.repo_url_combobox = QComboBox(self)
@@ -50,14 +55,13 @@ class Mario64All(QMainWindow):
         self.clone_button = QPushButton("Clone", self)
 
         self.options_widget = QWidget()
-        self.options_layout = QVBoxLayout(self.options_widget)
+        self.options_layout = QGridLayout(self.options_widget)
+        self.options_layout.setSpacing(
+            5
+        )  # Set the spacing between elements in options layout
         self.options_widget.setLayout(self.options_layout)
-
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setWidget(self.options_widget)
-
         self.setup_ui()
+        self.toggle_advanced_options(False)
 
     def load_repos(self):
         yaml_file = "repos.yaml"
@@ -79,19 +83,86 @@ class Mario64All(QMainWindow):
         self.connect_signals()
 
         self.output_text.setFixedHeight(200)
-        self.main_layout.addWidget(QLabel("Repository URL:"), 0, 0)
-        self.main_layout.addWidget(self.repo_url_combobox, 0, 1, 1, 3)
-        self.main_layout.addWidget(QLabel("Base Directory:"), 1, 0)
-        self.main_layout.addWidget(self.clone_dir_entry, 1, 1, 1, 2)
-        self.main_layout.addWidget(self.browse_button, 1, 3)
-        self.main_layout.addWidget(QLabel("Branch:"), 2, 0)
-        self.main_layout.addWidget(self.branch_menu, 2, 1, 1, 3)
-        self.main_layout.addWidget(self.clone_button, 3, 0, 1, 4)
-        self.main_layout.addWidget(self.progress_bar, 4, 0, 1, 4)
-        self.main_layout.addWidget(self.output_text, 5, 0, 1, 4)
-        self.main_layout.addWidget(self.advanced_checkbox, 6, 0, 1, 4)
-        self.main_layout.addWidget(QLabel("Options:"), 7, 0, 1, 4)
-        self.main_layout.addWidget(self.scroll_area, 8, 0, 1, 4)
+
+        # Fork Label and ComboBox
+        self.fork_collection = self.add_horizontal_widgets(
+            (
+                QLabel("Fork:"),
+                (QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed),
+            ),
+            (
+                self.repo_url_combobox,
+                (QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed),
+            ),
+        )
+
+        # Base Directory Label, Entry, and Browse Button
+        self.directory_collection = self.add_horizontal_widgets(
+            (
+                QLabel("Base Directory:"),
+                (QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed),
+            ),
+            (
+                self.clone_dir_entry,
+                (QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed),
+            ),
+            (
+                self.browse_button,
+                (QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed),
+            ),
+        )
+
+        # Branch Label, Branch Menu, and Clone Button
+        self.branch_collection = self.add_horizontal_widgets(
+            (
+                QLabel("Branch:"),
+                (QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed),
+            ),
+            (
+                self.branch_menu,
+                (QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed),
+            ),
+            (
+                self.clone_button,
+                (QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed),
+            ),
+        )
+
+        self.main_layout.addWidget(self.progress_bar)
+        self.main_layout.addWidget(self.output_text)
+
+        # Advanced Options Layout
+        advanced_options_layout = QHBoxLayout()
+        advanced_options_layout.addWidget(
+            QLabel("Options:", self), alignment=Qt.AlignmentFlag.AlignLeft
+        )
+        advanced_options_layout.addWidget(
+            self.advanced_checkbox, alignment=Qt.AlignmentFlag.AlignRight
+        )
+
+        # Add the advanced options layout to the main layout
+        self.main_layout.addLayout(advanced_options_layout)
+        self.main_layout.addWidget(
+            self.options_widget, alignment=Qt.AlignmentFlag.AlignTop
+        )
+
+        self.on_repo_selection()
+
+    def add_horizontal_widgets(self, *widgets_with_policies):
+        horizontal_layout = QHBoxLayout()
+        horizontal_layout.setContentsMargins(0, 0, 0, 0)  # Remove horizontal margins
+
+        for widget, policy in widgets_with_policies:
+            # Set the specific size policy provided
+            widget.setSizePolicy(policy[0], policy[1])
+            horizontal_layout.addWidget(widget)
+
+        # Align all widgets to the left
+        horizontal_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        # Add the horizontal layout to the main layout
+        self.main_layout.addLayout(horizontal_layout)
+        return horizontal_layout
 
     def connect_signals(self):
         self.advanced_checkbox.stateChanged.connect(self.toggle_advanced_options)
@@ -121,43 +192,70 @@ class Mario64All(QMainWindow):
                 self.options_layout.removeWidget(widget)
                 widget.setParent(None)
 
-        basic_options = {k: v for k, v in repo_options.items() if not v.get("advanced")}
-        advanced_options = {k: v for k, v in repo_options.items() if v.get("advanced")}
+        self.add_options_to_layout(repo_options)
 
-        self.add_options_to_layout(basic_options)
+    def add_options_to_layout(self, repo_options):
+        dropdowns = []
+        checkboxes = []
 
-        if self.advanced_checkbox.isChecked():
-            self.add_options_to_layout(advanced_options)
-
-    def add_options_to_layout(self, options):
-        for opt_name, opt_info in options.items():
+        for opt_name, opt_info in repo_options.items():
             if "values" not in opt_info:
                 continue
 
-            label = QLabel(f"{opt_name}:")
-            self.options_layout.addWidget(label)
+            if not opt_info.get("advanced") or self.advanced_checkbox.isChecked():
+                if (
+                    isinstance(opt_info["values"], list)
+                    and len(opt_info["values"]) == 2
+                    and 0 in opt_info["values"]
+                ):
+                    checkbox = QCheckBox(f"{opt_name}:", self)
+                    checkbox.setCheckState(
+                        Qt.CheckState.Checked
+                        if opt_info.get("default", 0)
+                        else Qt.CheckState.Unchecked
+                    )
+                    checkbox.stateChanged.connect(
+                        self.create_checkbox_handler(opt_name)
+                    )
+                    checkboxes.append((opt_name, checkbox))
+                else:
+                    combobox_label = QLabel(f"{opt_name}:", self)
+                    combobox = QComboBox(self)
+                    combobox.addItems([str(value) for value in opt_info["values"]])
+                    combobox.setCurrentText(str(opt_info.get("default", "")))
+                    combobox.currentTextChanged.connect(
+                        self.create_combobox_handler(opt_name)
+                    )
+                    dropdowns.append((combobox_label, combobox))
 
-            if (
-                isinstance(opt_info["values"], list)
-                and len(opt_info["values"]) == 2
-                and 0 in opt_info["values"]
-            ):
-                checkbox = QCheckBox(self)
-                checkbox.setCheckState(
-                    Qt.CheckState.Checked
-                    if opt_info.get("default", 0)
-                    else Qt.CheckState.Unchecked
-                )
-                checkbox.stateChanged.connect(self.create_checkbox_handler(opt_name))
-                self.options_layout.addWidget(checkbox)
-            else:
-                combobox = QComboBox(self)
-                combobox.addItems([str(value) for value in opt_info["values"]])
-                combobox.setCurrentText(str(opt_info.get("default", "")))
-                combobox.currentTextChanged.connect(
-                    self.create_combobox_handler(opt_name)
-                )
-                self.options_layout.addWidget(combobox)
+        row, col = 0, 0
+
+        for label, combobox in dropdowns:
+            self.options_layout.addWidget(label, row, col, 1, 1)
+            self.options_layout.addWidget(combobox, row, col + 1, 1, 1)
+            col += 2
+            if col >= 6:  # Move to the next row after 3 columns
+                row += 1
+                col = 0
+
+        for opt_name, checkbox in checkboxes:
+            self.options_layout.addWidget(
+                checkbox, row, col, 1, 2
+            )  # Full span for checkboxes
+            col += 2
+            if col >= 6:  # Move to the next row after 3 columns
+                row += 1
+                col = 0
+
+        # Adjust the window height based on the number of rows used
+        self.adjust_window_height(row)
+
+    def adjust_window_height(self, num_rows):
+        base_height = 600
+        row_height = 25  # Reduced height per row
+        additional_height = num_rows * row_height
+        new_height = base_height + additional_height
+        self.setFixedSize(700, new_height)
 
     def create_checkbox_handler(self, opt_name):
         return lambda state: self.user_selections.update(
@@ -169,6 +267,13 @@ class Mario64All(QMainWindow):
 
     def toggle_advanced_options(self, state):
         self.update_build_options(self.repo_options)
+        # Set visibility of all widgets contained within the fork_collection layout
+        visible = self.advanced_checkbox.isChecked()
+        for i in range(self.fork_collection.count()):
+            item = self.fork_collection.itemAt(i)
+            widget = item.widget()
+            if widget is not None:
+                widget.setVisible(visible)
 
     def browse_directory(self):
         directory = QFileDialog.getExistingDirectory(self, "Select Directory")
@@ -178,11 +283,12 @@ class Mario64All(QMainWindow):
     def update_output_text(self, text):
         self.output_text.append(text)
 
-    def cloning_finished(self):
-        self.output_text.append("Cloning finished!")
-
     def update_progress_bar(self, value):
         self.progress_bar.setValue(value)
+
+    def cloning_finished(self):
+        self.output_text.append("Cloning finished!")
+        self.dump_user_selections()
 
     def start_cloning(self):
         clone_dir = self.clone_dir_entry.text()
@@ -204,30 +310,30 @@ class Mario64All(QMainWindow):
         print("Starting cloning process...")
         self.thread.start()
 
-    def update_progress_bar(self, value):
-        print(f"Updating progress bar: {value}")
-        self.progress_bar.setValue(value)
-
-    def on_clone_finished(self):
-        self.dump_user_selections()
-
     def dump_user_selections(self):
         try:
+            # Ensure the clone directory exists
             clone_directory = self.clone_dir_entry.text()
             os.makedirs(clone_directory, exist_ok=True)
 
-            selections_file = os.path.join(clone_directory, "user_selections.yaml")
+            # Populate the user selections with defaults for missing values
+            populated_selections = {}
+            for opt_name, opt_info in self.repo_options.items():
+                if opt_name in self.user_selections:
+                    # Use the user selection
+                    populated_selections[opt_name] = self.user_selections[opt_name]
+                else:
+                    # Use the default value
+                    populated_selections[opt_name] = opt_info.get("default", "")
+
+            # Write to the YAML file
+            selections_file = os.path.join(clone_directory, ".user_selections.yaml")
             with open(selections_file, "w") as file:
-                dump(self.user_selections, file)
+                dump(populated_selections, file)
+
             self.output_text.append(f"User selections saved to {selections_file}.")
         except Exception as error:
             self.output_text.append(f"Error saving selections: {error}")
-
-    def closeEvent(self, event):
-        if self.clone_worker and self.clone_worker.isRunning():
-            self.clone_worker.quit()
-            self.clone_worker.wait()
-        super().closeEvent(event)
 
 
 if __name__ == "__main__":
