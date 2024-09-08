@@ -5,12 +5,15 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QComboBox, QProgr
 from PyQt6.QtWidgets import QPushButton, QCheckBox, QLineEdit, QFileDialog, QWidget, QGridLayout, QVBoxLayout, \
     QScrollArea, QMessageBox
 from yaml import dump, safe_load
-from gitlogic import update_branch_menu, clone_repository
+from gitlogic import update_branch_menu, CloneWorker
+from PyQt6.QtCore import QThread
+from PyQt6.QtWidgets import QMainWindow, QComboBox, QVBoxLayout, QTextEdit, QPushButton, QLineEdit, QProgressBar, QLabel
 
 
 class Mario64All(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.repo_url = None
         self.setWindowTitle("Mario Sixty For All")
         self.setFixedSize(700, 600)
 
@@ -85,6 +88,9 @@ class Mario64All(QMainWindow):
 
     def on_repo_selection(self):
         repo_name = self.repo_url_combobox.currentText()
+
+        self.repo_url = next((repo['url'] for repo in self.REPOS if repo['name'] == repo_name), None)
+
         default_dir = os.path.abspath(f"./{repo_name}")
         self.clone_dir_entry.setText(default_dir)
         repo = next((repo for repo in self.REPOS if repo['name'] == repo_name), None)
@@ -142,23 +148,30 @@ class Mario64All(QMainWindow):
         if directory:
             self.clone_dir_entry.setText(directory)
 
+    def update_output_text(self, text):
+        self.output_text.append(text)
+
+    def cloning_finished(self):
+        self.output_text.append("Cloning finished!")
+
     def start_cloning(self):
-        repo_name = self.repo_url_combobox.currentText()
         clone_dir = self.clone_dir_entry.text()
         branch = self.branch_menu.currentText()
 
-        repo_url = next((repo['url'] for repo in self.REPOS if repo['name'] == repo_name), None)
 
-        if not repo_url or not clone_dir:
-            QMessageBox.critical(self, "Input Error", "Please provide both the repository URL and base directory.")
-            return
+        self.worker = CloneWorker(self.repo_url, clone_dir, branch)
+        self.thread = QThread()
+        self.worker.moveToThread(self.thread)
 
-        if not branch:
-            QMessageBox.critical(self, "Input Error", "Please select a branch.")
-            return
+        self.worker.progress_signal.connect(self.update_output_text)
+        self.worker.finished_signal.connect(self.cloning_finished)
 
-        self.output_text.clear()
-        clone_repository(repo_url, clone_dir, branch, self.output_text)
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished_signal.connect(self.thread.quit)
+        self.worker.finished_signal.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+
+        self.thread.start()
 
     def on_clone_finished(self):
         self.dump_user_selections()

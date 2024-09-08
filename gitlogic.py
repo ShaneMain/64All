@@ -2,67 +2,74 @@ import os
 import shutil
 import threading
 import git
-from PyQt6.QtWidgets import QComboBox
+from PyQt6.QtCore import pyqtSignal, QObject
+from PyQt6.QtWidgets import QComboBox, QTextEdit
 from yaml import safe_load
 from functools import wraps
 
 
 class CloneProgress(git.remote.RemoteProgress):
-    def __init__(self, output_text):
+    def __init__(self, signal):
         super().__init__()
-        self.output_text = output_text
+        self.signal = signal
 
     def update(self, op_code, cur_count, max_count=None, message=''):
         super().update(op_code, cur_count, max_count, message)
         progress_message = f'Progress: {cur_count} out of {max_count}, {message}\n'
-        self.output_text.append(progress_message)
+        self.signal.emit(progress_message)
 
 
-def run_in_thread(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        thread = threading.Thread(target=fn, args=args, kwargs=kwargs)
-        thread.daemon = True
-        thread.start()
+class CloneWorker(QObject):
+    progress_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal()
 
-    return wrapper
+    def __init__(self, repo_url, clone_dir, branch):
+        super().__init__()
+        self.repo_url = repo_url
+        self.clone_dir = clone_dir
+        self.branch = branch
 
-def clone_repository(repo_url, clone_dir, branch, output_text):
-    try:
-        os.makedirs(clone_dir, exist_ok=True)
-        if not branch:
-            raise ValueError("Branch is not specified. Please select a valid branch.")
+    def run(self):
+        try:
+            os.makedirs(self.clone_dir, exist_ok=True)
+            if not self.branch:
+                raise ValueError("Branch is not specified. Please select a valid branch.")
 
-        clone_progress = CloneProgress(output_text)
-        output_text.append(f"Cloning repository from {repo_url} (branch: {branch}) to {clone_dir}...\n")
-        git.Repo.clone_from(repo_url, clone_dir, progress=clone_progress, branch=branch)
-        output_text.append("Repository cloned successfully.\n")
+            clone_progress = CloneProgress(self.progress_signal)
+            self.progress_signal.emit(
+                f"Cloning repository from {self.repo_url} (branch: {self.branch}) to {self.clone_dir}...\n")
+            git.Repo.clone_from(
+                self.repo_url,
+                self.clone_dir,
+                progress=clone_progress,
+                branch=self.branch,
+                depth=1,  # Perform shallow clone
+                single_branch=True  # Clone only the specified branch
+            )
+            self.progress_signal.emit("Repository cloned successfully.\n")
 
-    except git.exc.GitCommandError as e:
-        output_text.append(f"An error occurred while executing git command: {e}\n")
-        clean_up_directory(clone_dir, output_text)
-    except ValueError as e:
-        output_text.append(f"An error occurred: {e}\n")
-        clean_up_directory(clone_dir, output_text)
-    except Exception as e:
-        output_text.append(f"An error occurred while cloning the repository: {e}\n")
-        clean_up_directory(clone_dir, output_text)
+        except git.exc.GitCommandError as e:
+            self.progress_signal.emit(f"An error occurred while executing git command: {e}\n")
+            self.clean_up_directory()
+        except ValueError as e:
+            self.progress_signal.emit(f"An error occurred: {e}\n")
+            self.clean_up_directory()
+        except Exception as e:
+            self.progress_signal.emit(f"An error occurred while cloning the repository: {e}\n")
+            self.clean_up_directory()
+        finally:
+            self.finished_signal.emit()
+
+    def clean_up_directory(self):
+        try:
+            if os.path.exists(self.clone_dir):
+                shutil.rmtree(self.clone_dir)
+                self.progress_signal.emit(f"Cleaned up directory '{self.clone_dir}'.\n")
+        except Exception as e:
+            self.progress_signal.emit(f"Error cleaning up directory '{self.clone_dir}': {e}\n")
 
 
-def clean_up_directory(clone_dir, output_text):
-    try:
-        if os.path.exists(clone_dir):
-            shutil.rmtree(clone_dir)
-            output_text.append(f"Cleaned up directory '{clone_dir}'.\n")
-    except Exception as e:
-        output_text.append(f"Error cleaning up directory '{clone_dir}': {e}\n")
-
-
-import git
-from functools import wraps
-import threading
-
-def update_branch_menu(repo_name, REPOS, branch_menu:QComboBox):
+def update_branch_menu(repo_name, REPOS, branch_menu: QComboBox):
     try:
         print(f"Updating branch menu for repo: {repo_name}\n")
         repo_url = next((repo['url'] for repo in REPOS if repo['name'] == repo_name), None)
