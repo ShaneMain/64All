@@ -1,109 +1,86 @@
-import git
 import os
 import shutil
 import threading
-import subprocess
-from tkinter import messagebox
+import git
+from PyQt6.QtWidgets import QComboBox
+from yaml import safe_load
+from functools import wraps
 
 
 class CloneProgress(git.remote.RemoteProgress):
-    def __init__(self, progress_bar, output_text):
+    def __init__(self, output_text):
         super().__init__()
-        self.progress_bar = progress_bar
         self.output_text = output_text
-        self.progress_bar["value"] = 0
 
     def update(self, op_code, cur_count, max_count=None, message=''):
-        if max_count is not None:
-            self.progress_bar["maximum"] = max_count
-        self.progress_bar["value"] = cur_count
-        self.progress_bar.update_idletasks()
-        if message:
-            self.output_text.insert("end", message + "\n")
-            self.output_text.see("end")
-            self.output_text.update_idletasks()
+        super().update(op_code, cur_count, max_count, message)
+        progress_message = f'Progress: {cur_count} out of {max_count}, {message}\n'
+        self.output_text.append(progress_message)
 
 
-def clone_repo(repo_url, clone_dir, branch, progress_bar, output_text, root):
+def run_in_thread(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        thread = threading.Thread(target=fn, args=args, kwargs=kwargs)
+        thread.daemon = True
+        thread.start()
+
+    return wrapper
+
+def clone_repository(repo_url, clone_dir, branch, output_text):
     try:
-        if os.path.exists(clone_dir) and os.listdir(clone_dir):
-            raise Exception(f"Destination path '{clone_dir}' already exists and is not an empty directory.")
-
         os.makedirs(clone_dir, exist_ok=True)
-        output_text.insert("end", f"Cloning repository from {repo_url} (branch: {branch}) to {clone_dir}...\n")
-        root.title(f"Cloning repository from {repo_url} to {clone_dir}...")
-        progress = CloneProgress(progress_bar, output_text)
+        if not branch:
+            raise ValueError("Branch is not specified. Please select a valid branch.")
 
-        git.Repo.clone_from(repo_url, clone_dir, progress=progress, depth=1, branch=branch)
+        clone_progress = CloneProgress(output_text)
+        output_text.append(f"Cloning repository from {repo_url} (branch: {branch}) to {clone_dir}...\n")
+        git.Repo.clone_from(repo_url, clone_dir, progress=clone_progress, branch=branch)
+        output_text.append("Repository cloned successfully.\n")
 
-        root.title("Repository cloned successfully.")
-        output_text.insert("end", "Repository cloned successfully.\n")
-    except KeyboardInterrupt:
-        messagebox.showerror("Error", "Cloning process was interrupted.")
-        if os.path.exists(clone_dir) and not os.listdir(clone_dir):
-            shutil.rmtree(clone_dir)
+    except git.exc.GitCommandError as e:
+        output_text.append(f"An error occurred while executing git command: {e}\n")
+        clean_up_directory(clone_dir, output_text)
+    except ValueError as e:
+        output_text.append(f"An error occurred: {e}\n")
+        clean_up_directory(clone_dir, output_text)
     except Exception as e:
-        output_text.insert("end", f"An error occurred while cloning the repository: {e}\n")
-        messagebox.showerror("Error", f"An error occurred while cloning the repository: {e}")
-        if os.path.exists(clone_dir) and not os.listdir(clone_dir):
+        output_text.append(f"An error occurred while cloning the repository: {e}\n")
+        clean_up_directory(clone_dir, output_text)
+
+
+def clean_up_directory(clone_dir, output_text):
+    try:
+        if os.path.exists(clone_dir):
             shutil.rmtree(clone_dir)
-
-
-def start_cloning(repo_url_combobox, clone_dir_entry, branch_var, REPOS, progress_bar, output_text, root):
-    threading.Thread(
-        target=run_clone_thread,
-        args=(repo_url_combobox, clone_dir_entry, branch_var, REPOS, progress_bar, output_text, root)
-    ).start()
-
-
-def run_clone_thread(repo_url_combobox, clone_dir_entry, branch_var, REPOS, progress_bar, output_text, root):
-    try:
-        repo_name = repo_url_combobox.get()
-        base_dir = clone_dir_entry.get()
-        branch = branch_var.get()
-        clone_dir = os.path.join(base_dir, repo_name)
-
-        repo_url = next((repo['url'] for repo in REPOS if repo['name'] == repo_name), None)
-
-        if not repo_url or not base_dir:
-            messagebox.showerror("Input Error", "Please provide both the repository URL and base directory.")
-            return
-
-        if os.path.exists(clone_dir) and os.listdir(clone_dir):
-            messagebox.showerror("Directory Error",
-                                 f"Destination path '{clone_dir}' already exists and is not an empty directory. Please select another directory.")
-            return
-
-        progress_bar["value"] = 0
-        clone_repo(repo_url, clone_dir, branch, progress_bar, output_text, root)
+            output_text.append(f"Cleaned up directory '{clone_dir}'.\n")
     except Exception as e:
-        print(f"Error in run_clone_thread: {e}")
+        output_text.append(f"Error cleaning up directory '{clone_dir}': {e}\n")
 
 
-def update_branch_menu(repo_name, REPOS, branch_var, branch_menu):
+import git
+from functools import wraps
+import threading
+
+def update_branch_menu(repo_name, REPOS, branch_menu:QComboBox):
     try:
-        print(f"Updating branch menu for repo: {repo_name}")
+        print(f"Updating branch menu for repo: {repo_name}\n")
         repo_url = next((repo['url'] for repo in REPOS if repo['name'] == repo_name), None)
         if not repo_url:
-            branch_var.set("No branches found")
-            print("No repository URL found for the selected repository.")
+            print("No repository URL found for the selected repository.\n")
             return
 
-        result = subprocess.run(["git", "ls-remote", "--heads", repo_url], capture_output=True, text=True)
+        result = git.cmd.Git().ls_remote('--heads', repo_url)
 
-        if result.returncode != 0:
-            raise Exception(f"Failed to get remote branches: {result.stderr}")
-
-        branch_lines = result.stdout.splitlines()
+        branch_lines = result.strip().split('\n')
         branches = [line.split()[1].replace('refs/heads/', '') for line in branch_lines]
-        print(f"Branches found: {branches}")
+        print(f"Branches found: {branches}\n")
 
         default_branch = 'master' if 'master' in branches else 'main' if 'main' in branches else branches[0]
 
-        branch_menu['menu'].delete(0, 'end')
-        for branch in branches:
-            branch_menu['menu'].add_command(label=branch, command=lambda b=branch: branch_var.set(b))
-        branch_var.set(default_branch)
-    except Exception as e:
-        print(f"Error in update_branch_menu: {e}")
-        messagebox.showerror("Error", f"An error occurred while fetching branches: {e}")
+        branch_menu.clear()
+        branch_menu.addItems(branches)
+        branch_menu.setCurrentText(default_branch)
+
+    except git.exc.GitCommandError as e:
+        print(f"Error in update_branch_menu: {e}\n")
