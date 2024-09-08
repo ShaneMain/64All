@@ -1,0 +1,63 @@
+repos:
+  - name: Render96ex
+    url: "https://github.com/Render96/Render96ex.git"
+  - name: sm64ex
+    url: "https://github.com/sm64pc/sm64ex"
+    options:
+      VERSION:
+        default: us
+        values: [us, eu, jp, sh]
+      TARGET_BITS:
+        default: 32
+        values: [32, 64]
+      TARGET_RPI:
+        default: 0
+        values: [0, 1]
+      TARGET_WEB:
+        default: 0
+        values: [0, 1]
+      WINDOWS_BUILD:
+        default: 0
+        values: [0, 1]
+      OSX_BUILD:
+        default: 0
+        values: [0, 1]
+      WINDOWS_CONSOLE:
+        default: 0
+        values: [0, 1]
+      DEBUG:
+        default: 0
+        values: [0, 1]
+      RENDER_API:
+        default: GL
+        values: [GL, GL_LEGACY, D3D11, D3D12]
+      WINDOW_API:
+        default: SDL2
+        values: [SDL1, SDL2, DXGI]
+      AUDIO_API:
+        default: SDL2
+        values: [SDL1, SDL2]
+      CONTROLLER_API:
+        default: SDL2
+        values: [SDL2]
+      BETTERCAMERA:
+        default: 1
+        values: [0, 1]
+      NODRAWINGDISTANCE:
+        default: 1
+        values: [0, 1]
+      TEXTURE_FIX:
+        default: 1
+        values: [0, 1]
+      EXT_OPTIONS_MENU:
+        default: 1
+        values: [0, 1]
+      EXTERNAL_DATA:
+        default: 0
+        values: [0, 1]
+      DISCORDRPC:
+        default: 0
+        values: [0, 1]
+      TEXTSAVES:
+        default: 0
+        values: [0, 1]

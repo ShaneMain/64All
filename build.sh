@@ -40,7 +40,7 @@ poetry install
 PYTHON_PREFIX=$(pyenv prefix 3.11.5)
 echo "Python Prefix: $PYTHON_PREFIX"
 
-# Directly assign the library path
+# Define the library path
 LIB_PYTHON_PATH="$PYTHON_PREFIX/lib/libpython3.11.so.1.0"
 echo "Library Path: $LIB_PYTHON_PATH"
 
@@ -59,18 +59,14 @@ fi
 
 echo "Library found at $LIB_PYTHON_PATH"
 
-# Set LD_LIBRARY_PATH for the current session
-export LD_LIBRARY_PATH=$(dirname "$LIB_PYTHON_PATH")
-echo "LD_LIBRARY_PATH set to $LD_LIBRARY_PATH"
-
 # Clean previous builds
 rm -rf build dist 64All.spec
 
 # Create a lib directory within the build structure
-mkdir -p build/64All/_internal
+mkdir -p build/64All/lib
 
-# Copy the library to the build _internal directory
-cp "$LIB_PYTHON_PATH" build/64All/_internal
+# Copy the library to the build lib directory
+cp "$LIB_PYTHON_PATH" build/64All/lib
 
 # Generate the spec file for PyInstaller
 echo "Creating spec file..."
@@ -80,8 +76,8 @@ block_cipher = None
 
 a = Analysis(
     ['main.py'],
-    pathex=[],
-    binaries=[('build/64All/_internal/libpython3.11.so.1.0', './_internal')],
+    pathex=['.'],
+    binaries=[('build/64All/lib/libpython3.11.so.1.0', 'lib/libpython3.11.so.1.0')],
     datas=[],
     hiddenimports=['ttkthemes', 'theme_setter', 'gitlogic'],
     hookspath=[],
@@ -98,7 +94,7 @@ exe = EXE(
     pyz,
     a.scripts,
     [],
-    exclude_binaries=True,
+    exclude_binaries=True,  # Exclude binaries from COLLECT stage
     name='64All',
     debug=False,
     bootloader_ignore_signals=False,
@@ -115,7 +111,8 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=True,
-    name='64All'
+    name='64All',
+    binaries=[]  # Important to exclude additional binaries in COLLECT phase
 )
 EOF
 
@@ -125,8 +122,8 @@ poetry run pyinstaller 64All.spec
 
 # Ensure the shared library is included properly in the dist directory
 DIST_DIR="dist/64All"
-LIB_DIR="$DIST_DIR/_internal"
+LIB_DIR="$DIST_DIR/lib"
 mkdir -p "$LIB_DIR"
 cp "$LIB_PYTHON_PATH" "$LIB_DIR"
 
-echo "Executable created successfully. Library copied to $LIB_DIR."
+echo "Executable created successfully. A single executable is generated at dist/64All/64All."
