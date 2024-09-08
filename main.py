@@ -1,4 +1,4 @@
-from primary_window import GitRepoClonerApp
+from primary_window import Mario64All
 
 if __name__ == '__main__':
-    app = GitRepoClonerApp()
+    app = Mario64All()

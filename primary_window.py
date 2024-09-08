@@ -4,7 +4,7 @@ from tkinter import ttk, filedialog
 from ttkthemes import ThemedTk
 from gitlogic import update_branch_menu, start_cloning
 from theme_setter import set_theme
-from yaml import safe_load
+from yaml import safe_load, dump
 
 
 class Tooltip:
@@ -33,22 +33,44 @@ class Tooltip:
             self.tooltip_window = None
 
 
-class GitRepoClonerApp:
+class Mario64All:
     def __init__(self, root=None):
         if root is None:
-            root = ThemedTk(theme="equilux")
-        self.root = root
+            self.root = ThemedTk()
+        else:
+            self.root = root
+
+        self.main_frame = ttk.Frame(self.root, padding=0)
+        self.main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+
+        self.repo_url_combobox = None  # Initialize as None first
+        self.repo_name = ""
+        self.output_text = tk.Text(self.main_frame, height=10, width=60)
+        self.progress_bar = ttk.Progressbar(self.main_frame, orient="horizontal", length=400, mode="determinate")
+        self.branch_var = tk.StringVar()
+        self.clone_dir_entry = ttk.Entry(self.main_frame, width=50)
+        self.repo_options = None
+        self.show_advanced_var = tk.IntVar(value=0)
+        self.advanced_checkbox = ttk.Checkbutton(
+            self.main_frame, text="Show advanced options", variable=self.show_advanced_var,
+            command=self.toggle_advanced_options
+        )
+        self.branch_menu = ttk.OptionMenu(self.main_frame, self.branch_var, "")
+        self.branch_label = ttk.Label(self.main_frame, text="Branch:")
+        self.REPOS = []
         self.build_options_vars = {}
         self.tooltip_bg_color = ""
         self.tooltip_fg_color = ""
+
         self.setup_ui()
         self.root.mainloop()
 
     def setup_ui(self):
-        self.root.title("Git Repo Cloner")
+        self.root.title("Mario Sixty For All")
         self.root.resizable(width=False, height=False)
         self.root.configure(padx=0, pady=0)
 
+        # Apply theme using theme_setter
         set_theme(self.root)
 
         self.load_repos()
@@ -57,8 +79,10 @@ class GitRepoClonerApp:
         self.tooltip_bg_color = style.lookup('TLabel', 'background')
         self.tooltip_fg_color = style.lookup('TLabel', 'foreground')
 
-        self.main_frame = ttk.Frame(self.root, padding=0)
-        self.main_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
+        # Apply theme colors to the output_text widget
+        output_text_bg = style.lookup('TEntry', 'fieldbackground')
+        output_text_fg = style.lookup('TEntry', 'foreground')
+        self.output_text.configure(background=output_text_bg, foreground=output_text_fg)
 
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
@@ -66,18 +90,13 @@ class GitRepoClonerApp:
         for i in range(10):
             self.main_frame.columnconfigure(i, weight=1)
 
-        self.show_advanced_var = tk.IntVar(value=0)
-        self.advanced_checkbox = ttk.Checkbutton(
-            self.main_frame, text="Show advanced options", variable=self.show_advanced_var,
-            command=self.toggle_advanced_options
-        )
         self.advanced_checkbox.grid(row=0, column=10, padx=5, pady=3, sticky=tk.E)
 
         self.setup_repo_options()
+        self.repo_name = self.repo_url_combobox.get()  # Assign value after initialization
 
-        initial_repo_name = self.repo_url_combobox.get()
-        self.update_branch_menu(initial_repo_name)
-        repo = next((repo for repo in self.REPOS if repo['name'] == initial_repo_name), None)
+        self.update_branch_menu(self.repo_name)
+        repo = next((repo for repo in self.REPOS if repo['name'] == self.repo_name), None)
         if repo:
             self.repo_options = repo.get('options', {})
             self.create_build_option_widgets(self.repo_options, self.tooltip_bg_color, self.tooltip_fg_color,
@@ -93,20 +112,22 @@ class GitRepoClonerApp:
                 self.REPOS = data['repos']
         except Exception as error:
             print(f"Error loading YAML file: {error}")
-            self.REPOS = []
 
     def setup_repo_options(self):
         repo_names = [repo['name'] for repo in self.REPOS]
 
         self.repo_url_combobox = ttk.Combobox(self.main_frame, values=repo_names, width=47)
         self.repo_url_combobox.grid(row=0, column=2, columnspan=8, padx=5, pady=3, sticky=tk.W)
-        self.repo_url_combobox.current(0)
+
+        if repo_names:
+            self.repo_url_combobox.current(0)  # Set to the first repo by default
+            self.repo_name = self.repo_url_combobox.get()  # Also set the repo_name
+
         self.repo_url_combobox.bind("<<ComboboxSelected>>", self.on_repo_selection)
 
         ttk.Label(self.main_frame, text="Repository URL:").grid(row=0, column=0, columnspan=2, padx=5, pady=3,
                                                                 sticky=tk.W)
 
-        self.clone_dir_entry = ttk.Entry(self.main_frame, width=50)
         self.clone_dir_entry.grid(row=1, column=2, columnspan=6, padx=5, pady=3, sticky=tk.W)
 
         browse_button = ttk.Button(self.main_frame, text="Browse...", command=self.browse_directory)
@@ -119,21 +140,16 @@ class GitRepoClonerApp:
         default_clone_dir = os.path.abspath(f"./{initial_repo_name}")
         self.clone_dir_entry.insert(0, default_clone_dir)
 
-        self.branch_label = ttk.Label(self.main_frame, text="Branch:")
         self.branch_label.grid(row=2, column=0, columnspan=2, padx=5, pady=3, sticky=tk.W)
 
-        self.branch_var = tk.StringVar()
-        self.branch_menu = ttk.OptionMenu(self.main_frame, self.branch_var, "")
         self.branch_menu.config(width=45)
         self.branch_menu.grid(row=2, column=2, columnspan=8, padx=5, pady=3, sticky=tk.W)
 
         clone_button = ttk.Button(self.main_frame, text="Clone", command=self.start_cloning)
         clone_button.grid(row=3, column=0, columnspan=10, padx=5, pady=8, sticky=tk.W + tk.E)
 
-        self.progress_bar = ttk.Progressbar(self.main_frame, orient="horizontal", length=400, mode="determinate")
         self.progress_bar.grid(row=4, column=0, columnspan=10, padx=5, pady=5, sticky=tk.W + tk.E)
 
-        self.output_text = tk.Text(self.main_frame, height=10, width=60)
         self.output_text.grid(row=5, column=0, columnspan=10, padx=5, pady=5, sticky=tk.W + tk.E)
 
     def update_branch_menu(self, repo_name):
@@ -164,14 +180,14 @@ class GitRepoClonerApp:
 
                 if isinstance(opt_info['values'], list) and len(opt_info['values']) == 2 and 0 in opt_info['values']:
                     var = tk.IntVar(value=opt_info.get('default', 0))
-                    widget = ttk.Checkbutton(self.main_frame, variable=var)
+                    option_widget = ttk.Checkbutton(self.main_frame, variable=var)
                 else:
                     var = tk.StringVar(value=opt_info.get('default', ''))
                     values = opt_info.get('values', [])
-                    widget = ttk.OptionMenu(self.main_frame, var, var.get(), *values)
+                    option_widget = ttk.OptionMenu(self.main_frame, var, var.get(), *values)
 
-                widget.grid(row=row_offset, column=(column * 2) + 1, padx=5, pady=3, sticky=tk.W)
-                Tooltip(widget, opt_info.get('description', ''), bg_color, fg_color)
+                option_widget.grid(row=row_offset, column=(column * 2) + 1, padx=5, pady=3, sticky=tk.W)
+                Tooltip(option_widget, opt_info.get('description', ''), bg_color, fg_color)
                 self.build_options_vars[opt_name] = var
                 row_offset += 1
 
@@ -182,9 +198,19 @@ class GitRepoClonerApp:
         if show_advanced:
             row_offset_advanced = create_widgets(advanced_options, row_offset_advanced, column=1)
 
-            # Sort checkboxes at the bottom of both columns
+            # Ensure checkboxes are sorted at the bottom of both columns
             row_offset_standard = max(row_offset_standard, row_offset_advanced)
-            row_offset_advanced = row_offset_standard
+
+        # Store advanced options defaults if they are not shown
+        if not show_advanced:
+            for opt_name, opt_info in advanced_options.items():
+                if opt_name not in self.build_options_vars:
+                    if 'values' in opt_info:
+                        if isinstance(opt_info['values'], list) and len(opt_info['values']) == 2 and 0 in opt_info[
+                            'values']:
+                            self.build_options_vars[opt_name] = tk.IntVar(value=opt_info.get('default', 0))
+                        else:
+                            self.build_options_vars[opt_name] = tk.StringVar(value=opt_info.get('default', ''))
 
         self.update_advanced_checkbox(row_offset_standard)
 
@@ -193,7 +219,6 @@ class GitRepoClonerApp:
 
     def toggle_advanced_options(self, reset_grid=True):
         if reset_grid:
-            self.repo_name = self.repo_url_combobox.get()
             repo = next((repo for repo in self.REPOS if repo['name'] == self.repo_name), None)
             if repo:
                 self.repo_options = repo.get('options', {})
@@ -207,13 +232,13 @@ class GitRepoClonerApp:
 
     def on_repo_selection(self, event):
         try:
-            repo_name = self.repo_url_combobox.get()
-            default_dir = os.path.abspath(f"./{repo_name}")
+            self.repo_name = self.repo_url_combobox.get()
+            default_dir = os.path.abspath(f"./{self.repo_name}")
             self.clone_dir_entry.delete(0, tk.END)
             self.clone_dir_entry.insert(0, default_dir)
-            self.update_branch_menu(repo_name)
+            self.update_branch_menu(self.repo_name)
 
-            repo = next((repo for repo in self.REPOS if repo['name'] == repo_name), None)
+            repo = next((repo for repo in self.REPOS if repo['name'] == self.repo_name), None)
             if repo:
                 self.repo_options = repo.get('options', {})
                 self.create_build_option_widgets(self.repo_options, self.tooltip_bg_color, self.tooltip_fg_color,
@@ -231,11 +256,28 @@ class GitRepoClonerApp:
             print(f"Error in browse_directory: {error}")
 
     def start_cloning(self):
+        self.save_user_selections()  # Save selections before cloning
         start_cloning(
             self.repo_url_combobox, self.clone_dir_entry, self.branch_var, self.REPOS, self.progress_bar,
             self.output_text, self.root
         )
 
+    def save_user_selections(self):
+        user_selections = {
+            "repo_name": self.repo_name,
+            "clone_dir": self.clone_dir_entry.get(),
+            "branch": self.branch_var.get(),
+            "build_options": {opt_name: var.get() for opt_name, var in self.build_options_vars.items()}
+        }
+
+        yaml_file = '.userselections.yaml'
+        try:
+            with open(yaml_file, 'w') as file:
+                dump(user_selections, file)
+            print(f"User selections saved to {yaml_file}")
+        except Exception as error:
+            print(f"Error saving user selections to YAML file: {error}")
+
 
 if __name__ == "__main__":
-    app = GitRepoClonerApp()
+    app = Mario64All()
