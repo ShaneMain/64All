@@ -44,10 +44,30 @@ fi
 
 poetry install
 
-poetry run python3 -m pip install toml pyqt6 modulegraph gitpython pyyaml
+poetry run python3 -m pip install toml pyqt6 gitpython pyyaml
+
+echo "Dependencies from pyproject.toml:"
+poetry run python3 << EOF
+import toml
+
+def get_dependencies(pyproject_file):
+    with open(pyproject_file, 'r') as f:
+        pyproject_data = toml.load(f)
+
+    dependencies = pyproject_data.get('tool', {}).get('poetry', {}).get('dependencies', {})
+    return dependencies
+
+dependencies = get_dependencies('$PYPROJECT_TOML_PATH')
+for package, version in dependencies.items():
+    print(f"{package} == {version}")
+EOF
 
 PYTHON_PREFIX=$(pyenv prefix 3.11.5)
+PYTHON_VERSION="3.11.5"
+echo "Python Prefix: $PYTHON_PREFIX"
+
 LIB_PYTHON_PATH="$PYTHON_PREFIX/lib/libpython3.11.so.1.0"
+echo "Library Path: $LIB_PYTHON_PATH"
 
 if [ ! -f "$LIB_PYTHON_PATH" ]; then
     echo "Error: libpython3.11.so.1.0 was not found in pyenv directories."
@@ -63,68 +83,35 @@ fi
 echo "Library found at $LIB_PYTHON_PATH"
 
 rm -rf build dist 64All.spec
+mkdir -p build/64All/lib
+
+# Copy the Python library
+cp "$LIB_PYTHON_PATH" build/64All/lib
 
 # Define the build directory
 BUILD_DIR="build/64All/lib"
-mkdir -p $BUILD_DIR
-
-cp "$LIB_PYTHON_PATH" "$BUILD_DIR"
+# Get the site-packages directory for hidden imports
+SITE_PACKAGES_DIR=$(poetry run python3 -c "import site; print(site.getsitepackages()[0])")
 
 export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
 
 echo "Creating spec file..."
 cat << 'EOF' > 64All.spec
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
-import PyQt6
-import os
-import modulegraph.modulegraph
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 
-def find_all_imports(entry_point):
-    mg = modulegraph.modulegraph.ModuleGraph()
-    mg.run_script(entry_point)
-    return mg
-
-# Entry point of your application
-entry_point = 'src/main.py'
-mg = find_all_imports(entry_point)
-
-# Collect the necessary imports from `src.main`
-my_package_hiddenimports = [
-    node.identifier
-    for node in mg.flatten()
-    if node.identifier.startswith('src.main') and not node.identifier.endswith('__init__')
-]
-
-block_cipher = None
-
-# Define the necessary paths for binaries and data files
-binaries = []
-datas = []
-
-# Collect data files from the src directory
-my_package_datas = collect_data_files('src')
-datas.extend(my_package_datas)
-
-# Include your YAML file using a relative path
-datas.append(('./config/repos.yaml', 'config'))
-
-# Predefined paths for PyQt6 plugins
-qt_plugins_path = os.path.join(os.path.dirname(PyQt6.__file__), 'Qt6', 'plugins')
-
-# Include the entry point of your application explicitly
-datas.append((os.path.join('src', 'main.py'), '.'))
+# Collect hidden imports
+hiddenimports = collect_submodules('src.main')
 
 a = Analysis(
     ['src/main.py'],  # Entry point of your application
     pathex=['src'],
-    binaries=binaries,
-    datas=datas,
-    hiddenimports=my_package_hiddenimports,
+    binaries=[],
+    datas=[],
+    hiddenimports=hiddenimports,
     hookspath=[],  # Specify your custom hooks directory if any
-    noarchive=False,
+    noarchive=True,  # Enable noarchive to improve loading time
 )
 
 pyz = PYZ(
@@ -138,14 +125,12 @@ exe = EXE(
     a.scripts,
     a.binaries,
     a.datas,
-    exclude_binaries=False,
+    exclude_binaries=True,  # Exclude binaries to reduce size
     name='64AllExecutable',  # Change the name of the executable
     debug=False,
     bootloader_ignore_signals=False,
-    strip=True,  # Strip debug symbols
-    upx=True,  # Enable UPX compression
-    upx_exclude=[],
-    runtime_tmpdir=None,
+    strip=True,
+    upx=True,
     console=True,
     onefile=True
 )
@@ -155,9 +140,8 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    strip=True,  # Strip debug symbols
-    upx=True,  # Enable UPX compression
-    upx_exclude=[],
+    strip=True,
+    upx=True,
     name='64All',
 )
 EOF
