@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
 )
 from yaml import dump, safe_load
 
-from gitlogic import update_branch_menu, CloneWorker
+from src.logic.gitlogic import update_branch_menu, CloneWorker
 
 
 class Mario64All(QMainWindow):
@@ -67,7 +67,9 @@ class Mario64All(QMainWindow):
         self.update_advanced_options()
 
     def load_repos(self):
-        yaml_file = "repos.yaml"
+        current_directory = os.path.dirname(os.path.abspath(__file__))
+        yaml_file = os.path.join(current_directory, "../..", "config", "repos.yaml")
+        yaml_file = os.path.abspath(yaml_file)
         try:
             with open(yaml_file, "r") as file:
                 data = safe_load(file)
