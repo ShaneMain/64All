@@ -1,27 +1,25 @@
 import os
 import sys
 
-from PyQt6.QtCore import Qt, QThread
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
-    QLabel,
-    QComboBox,
     QProgressBar,
     QTextEdit,
     QPushButton,
-    QCheckBox,
     QLineEdit,
     QFileDialog,
     QWidget,
     QGridLayout,
     QVBoxLayout,
     QHBoxLayout,
-    QSizePolicy,
+    QSizePolicy, QLabel, QComboBox, QCheckBox,
 )
-from yaml import dump, safe_load
+from yaml import dump
 
-from src.logic.gitlogic import update_branch_menu, CloneWorker
+from src.Qt.build_option_utils import add_options_to_layout
+from src.Qt.git_utils import start_cloning, on_repo_selection, load_repos
 
 
 class Mario64All(QMainWindow):
@@ -66,25 +64,13 @@ class Mario64All(QMainWindow):
         self.setup_ui()
         self.update_advanced_options()
 
-    def load_repos(self):
-        current_directory = os.path.dirname(os.path.abspath(__file__))
-        yaml_file = os.path.join(current_directory, "../..", "config", "repos.yaml")
-        yaml_file = os.path.abspath(yaml_file)
-        try:
-            with open(yaml_file, "r") as file:
-                data = safe_load(file)
-                self.REPOS = data.get("repos", [])
-                self.populate_repo_urls()
-        except Exception as error:
-            print(f"Error loading YAML file: {error}")
-
     def populate_repo_urls(self):
         self.repo_url_combobox.clear()
         for repo in self.REPOS:
             self.repo_url_combobox.addItem(repo["name"])
 
     def setup_ui(self):
-        self.load_repos()
+        load_repos(self)
         self.connect_signals()
 
         self.output_text.setFixedHeight(200)
@@ -151,7 +137,7 @@ class Mario64All(QMainWindow):
             self.options_widget, alignment=Qt.AlignmentFlag.AlignTop
         )
 
-        self.on_repo_selection()
+        on_repo_selection(self)
 
     def add_horizontal_widgets(self, *widgets_with_policies):
         horizontal_layout = QHBoxLayout()
@@ -175,24 +161,9 @@ class Mario64All(QMainWindow):
 
     def connect_signals(self):
         self.advanced_checkbox.stateChanged.connect(self.update_advanced_options)
-        self.repo_url_combobox.currentIndexChanged.connect(self.on_repo_selection)
+        self.repo_url_combobox.currentIndexChanged.connect(lambda _: on_repo_selection(self))
         self.browse_button.clicked.connect(self.browse_directory)
-        self.clone_button.clicked.connect(self.start_cloning)
-
-    def on_repo_selection(self):
-        repo_name = self.repo_url_combobox.currentText()
-
-        self.repo_url = next(
-            (repo["url"] for repo in self.REPOS if repo["name"] == repo_name), None
-        )
-
-        default_dir = os.path.abspath(f"./{repo_name}")
-        self.clone_dir_entry.setText(default_dir)
-        repo = next((repo for repo in self.REPOS if repo["name"] == repo_name), None)
-        if repo:
-            update_branch_menu(repo_name, self.REPOS, self.branch_menu)
-            self.repo_options = repo.get("options", {})
-            self.update_build_options(self.repo_options)
+        self.clone_button.clicked.connect(start_cloning)
 
     def update_build_options(self, repo_options):
         for i in reversed(range(self.options_layout.count())):
@@ -201,78 +172,7 @@ class Mario64All(QMainWindow):
                 self.options_layout.removeWidget(widget)
                 widget.setParent(None)
 
-        self.add_options_to_layout(repo_options)
-
-    def add_options_to_layout(self, repo_options):
-        dropdowns = []
-        checkboxes = []
-
-        for opt_name, opt_info in repo_options.items():
-            if "values" not in opt_info:
-                continue
-
-            if not opt_info.get("advanced") or self.advanced_checkbox.isChecked():
-                tooltip_text = opt_info.get("description", "")
-
-                if (
-                    isinstance(opt_info["values"], list)
-                    and len(opt_info["values"]) == 2
-                    and 0 in opt_info["values"]
-                ):
-                    checkbox = QCheckBox(f"{opt_name}:", self)
-                    checkbox.setCheckState(
-                        Qt.CheckState.Checked
-                        if opt_info.get("default", 0)
-                        else Qt.CheckState.Unchecked
-                    )
-                    checkbox.stateChanged.connect(
-                        self.create_checkbox_handler(opt_name)
-                    )
-                    checkbox.setToolTip(tooltip_text)
-                    checkboxes.append((opt_name, checkbox))
-                else:
-                    combobox_label = QLabel(f"{opt_name}:", self)
-                    combobox_label.setToolTip(tooltip_text)
-                    combobox = QComboBox(self)
-                    combobox.addItems([str(value) for value in opt_info["values"]])
-                    combobox.setCurrentText(str(opt_info.get("default", "")))
-                    combobox.currentTextChanged.connect(
-                        self.create_combobox_handler(opt_name)
-                    )
-                    combobox.setToolTip(tooltip_text)
-                    dropdowns.append((combobox_label, combobox))
-
-        row, col = 0, 0
-
-        for label, combobox in dropdowns:
-            self.options_layout.addWidget(label, row, col, 1, 1)
-            self.options_layout.addWidget(combobox, row, col + 1, 1, 1)
-            col += 2
-            if col >= 6:  # Move to the next row after 3 columns
-                row += 1
-                col = 0
-
-        for opt_name, checkbox in checkboxes:
-            self.options_layout.addWidget(
-                checkbox, row, col, 1, 2
-            )  # Full span for checkboxes
-            col += 2
-            if col >= 6:  # Move to the next row after 3 columns
-                row += 1
-                col = 0
-
-        # Adjust the window height based on the number of rows used
-        self.adjust_window_height(row)
-
-    def adjust_window_height(self, num_rows):
-        if self.advanced_checkbox.isChecked():
-            base_height = 415 + self.branch_menu.height()
-        else:
-            base_height = 400
-        row_height = 25
-        additional_height = num_rows * row_height
-        new_height = base_height + additional_height
-        self.setFixedSize(675, new_height)
+        add_options_to_layout(self, repo_options)
 
     def create_checkbox_handler(self, opt_name):
         return lambda state: self.user_selections.update(
@@ -308,26 +208,6 @@ class Mario64All(QMainWindow):
             return
         self.output_text.append("Cloning finished!")
         self.dump_user_selections()
-
-    def start_cloning(self):
-        clone_dir = self.clone_dir_entry.text()
-        branch = self.branch_menu.currentText()
-
-        self.worker = CloneWorker(self.repo_url, clone_dir, branch)
-        self.thread = QThread()
-        self.worker.moveToThread(self.thread)
-
-        self.worker.progress_signal.connect(self.update_progress_bar)
-        self.worker.text_signal.connect(self.update_output_text)
-        self.worker.finished_signal.connect(self.cloning_finished)
-
-        self.thread.started.connect(self.worker.run)
-        self.worker.finished_signal.connect(self.thread.quit)
-        self.worker.finished_signal.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
-
-        print("Starting cloning process...")
-        self.thread.start()
 
     def dump_user_selections(self):
         try:
