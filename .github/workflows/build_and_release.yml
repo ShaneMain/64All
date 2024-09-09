@@ -67,8 +67,8 @@ jobs:
         run: |
           source ~/.bashrc
           pyenv activate venv-3.11.5
-          chmod +x ./build.sh
-          ./build.sh
+          chmod +x ./scripts/build.sh
+          ./scripts/build.sh
 
       - name: Generate unique tag
         id: generate_tag
