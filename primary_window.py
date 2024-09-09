@@ -27,6 +27,9 @@ from gitlogic import update_branch_menu, CloneWorker
 class Mario64All(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.branch_collection = None
+        self.directory_collection = None
+        self.fork_collection = None
         self.repo_url = None
         self.setWindowTitle("Mario Sixty For All")
         self.setFixedSize(700, 600)
@@ -61,7 +64,7 @@ class Mario64All(QMainWindow):
         )  # Set the spacing between elements in options layout
         self.options_widget.setLayout(self.options_layout)
         self.setup_ui()
-        self.toggle_advanced_options(False)
+        self.update_advanced_options()
 
     def load_repos(self):
         yaml_file = "repos.yaml"
@@ -94,6 +97,10 @@ class Mario64All(QMainWindow):
                 self.repo_url_combobox,
                 (QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed),
             ),
+            (
+                self.clone_button,
+                (QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed),
+            ),
         )
 
         # Base Directory Label, Entry, and Browse Button
@@ -122,10 +129,6 @@ class Mario64All(QMainWindow):
                 self.branch_menu,
                 (QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed),
             ),
-            (
-                self.clone_button,
-                (QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed),
-            ),
         )
 
         self.main_layout.addWidget(self.progress_bar)
@@ -152,20 +155,24 @@ class Mario64All(QMainWindow):
         horizontal_layout = QHBoxLayout()
         horizontal_layout.setContentsMargins(0, 0, 0, 0)  # Remove horizontal margins
 
-        for widget, policy in widgets_with_policies:
+        for widget_with_policy in widgets_with_policies:
+            widget, policy = widget_with_policy[:2]
+            alignment = widget_with_policy[2] if len(widget_with_policy) > 2 else None
+
             # Set the specific size policy provided
             widget.setSizePolicy(policy[0], policy[1])
-            horizontal_layout.addWidget(widget)
 
-        # Align all widgets to the left
-        horizontal_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+            if alignment:
+                horizontal_layout.addWidget(widget, 0, alignment)
+            else:
+                horizontal_layout.addWidget(widget)
 
         # Add the horizontal layout to the main layout
         self.main_layout.addLayout(horizontal_layout)
         return horizontal_layout
 
     def connect_signals(self):
-        self.advanced_checkbox.stateChanged.connect(self.toggle_advanced_options)
+        self.advanced_checkbox.stateChanged.connect(self.update_advanced_options)
         self.repo_url_combobox.currentIndexChanged.connect(self.on_repo_selection)
         self.browse_button.clicked.connect(self.browse_directory)
         self.clone_button.clicked.connect(self.start_cloning)
@@ -203,6 +210,8 @@ class Mario64All(QMainWindow):
                 continue
 
             if not opt_info.get("advanced") or self.advanced_checkbox.isChecked():
+                tooltip_text = opt_info.get("description", "")
+
                 if (
                     isinstance(opt_info["values"], list)
                     and len(opt_info["values"]) == 2
@@ -217,15 +226,18 @@ class Mario64All(QMainWindow):
                     checkbox.stateChanged.connect(
                         self.create_checkbox_handler(opt_name)
                     )
+                    checkbox.setToolTip(tooltip_text)
                     checkboxes.append((opt_name, checkbox))
                 else:
                     combobox_label = QLabel(f"{opt_name}:", self)
+                    combobox_label.setToolTip(tooltip_text)
                     combobox = QComboBox(self)
                     combobox.addItems([str(value) for value in opt_info["values"]])
                     combobox.setCurrentText(str(opt_info.get("default", "")))
                     combobox.currentTextChanged.connect(
                         self.create_combobox_handler(opt_name)
                     )
+                    combobox.setToolTip(tooltip_text)
                     dropdowns.append((combobox_label, combobox))
 
         row, col = 0, 0
@@ -251,11 +263,14 @@ class Mario64All(QMainWindow):
         self.adjust_window_height(row)
 
     def adjust_window_height(self, num_rows):
-        base_height = 600
-        row_height = 25  # Reduced height per row
+        if self.advanced_checkbox.isChecked():
+            base_height = 415 + self.branch_menu.height()
+        else:
+            base_height = 400
+        row_height = 25
         additional_height = num_rows * row_height
         new_height = base_height + additional_height
-        self.setFixedSize(700, new_height)
+        self.setFixedSize(675, new_height)
 
     def create_checkbox_handler(self, opt_name):
         return lambda state: self.user_selections.update(
@@ -265,12 +280,12 @@ class Mario64All(QMainWindow):
     def create_combobox_handler(self, opt_name):
         return lambda text: self.user_selections.update({opt_name: text})
 
-    def toggle_advanced_options(self, state):
+    def update_advanced_options(self):
         self.update_build_options(self.repo_options)
         # Set visibility of all widgets contained within the fork_collection layout
         visible = self.advanced_checkbox.isChecked()
-        for i in range(self.fork_collection.count()):
-            item = self.fork_collection.itemAt(i)
+        for i in range(self.branch_collection.count()):
+            item = self.branch_collection.itemAt(i)
             widget = item.widget()
             if widget is not None:
                 widget.setVisible(visible)
@@ -286,7 +301,9 @@ class Mario64All(QMainWindow):
     def update_progress_bar(self, value):
         self.progress_bar.setValue(value)
 
-    def cloning_finished(self):
+    def cloning_finished(self, success):
+        if not success:
+            return
         self.output_text.append("Cloning finished!")
         self.dump_user_selections()
 

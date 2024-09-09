@@ -32,14 +32,21 @@ class CloneProgress(git.remote.RemoteProgress):
         self.progress_signal.emit(self.total_progress)
 
         # Emit a progress message
-        progress_message = f"Progress: {cur_count} out of {max_count if max_count is not None else 'unknown'}, {message}\n"
+        progress_message = (
+            f"Progress: {cur_count:,} out of {max_count:,} ({(cur_count / max_count) * 100:.2f}%)"
+            if max_count
+            else f"Progress: {cur_count:,}, max count unknown."
+        )
+        if message:
+            progress_message += f" Message: {message}"
+
         self.text_signal.emit(progress_message)
 
 
 class CloneWorker(QObject):
     progress_signal = pyqtSignal(int)
     text_signal = pyqtSignal(str)
-    finished_signal = pyqtSignal()
+    finished_signal = pyqtSignal(bool)  # Emit a bool indicating success or failure
 
     def __init__(self, repo_url, clone_dir, branch):
         super().__init__()
@@ -49,6 +56,12 @@ class CloneWorker(QObject):
 
     def run(self):
         try:
+            # Check if directory already exists
+            if os.path.exists(self.clone_dir):
+                raise FileExistsError(
+                    f"The directory '{self.clone_dir}' already exists. Please select a different directory."
+                )
+
             os.makedirs(self.clone_dir, exist_ok=True)
             if not self.branch:
                 raise ValueError(
@@ -70,6 +83,12 @@ class CloneWorker(QObject):
             )
             self.text_signal.emit("Repository cloned successfully.\n")
 
+            # Emit finished signal with success status
+            self.finished_signal.emit(True)
+
+        except FileExistsError as e:
+            self.text_signal.emit(f"Warning: {e}\n")
+            self.terminate_thread(False)
         except git.exc.GitCommandError as e:
             self.text_signal.emit(
                 f"An error occurred while executing git command: {e}\n"
@@ -78,16 +97,21 @@ class CloneWorker(QObject):
                 f"Full Command: {e.command}\nOutput:\n{e.stdout}\nError Output:\n{e.stderr}\n"
             )
             self.clean_up_directory()
+            self.terminate_thread(False)
         except ValueError as e:
             self.text_signal.emit(f"An error occurred: {e}\n")
             self.clean_up_directory()
+            self.terminate_thread(False)
         except Exception as e:
             self.text_signal.emit(
                 f"An unexpected error occurred while cloning the repository: {e}\n"
             )
             self.clean_up_directory()
-        finally:
-            self.finished_signal.emit()
+            self.terminate_thread(False)
+
+    def terminate_thread(self, success):
+        # Emit the finished signal to indicate the task is complete and should terminate the thread
+        self.finished_signal.emit(success)
 
     def clean_up_directory(self):
         try:
