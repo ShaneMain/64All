@@ -56,12 +56,6 @@ class CloneWorker(QObject):
 
     def run(self):
         try:
-            # Check if directory already exists
-            if os.path.exists(self.clone_dir):
-                raise FileExistsError(
-                    f"The directory '{self.clone_dir}' already exists. Please select a different directory."
-                )
-
             os.makedirs(self.clone_dir, exist_ok=True)
             if not self.branch:
                 raise ValueError(
@@ -118,6 +112,7 @@ class CloneWorker(QObject):
             if os.path.exists(self.clone_dir):
                 shutil.rmtree(self.clone_dir)
                 self.text_signal.emit(f"Cleaned up directory '{self.clone_dir}'.\n")
+                self.run()
         except Exception as e:
             self.text_signal.emit(
                 f"Error cleaning up directory '{self.clone_dir}': {e}\n"
