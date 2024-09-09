@@ -2,6 +2,15 @@
 
 set -e
 
+# Function to check if a virtual environment is active
+function is_venv_active() {
+    if [ -z "$VIRTUAL_ENV" ]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
 # Add pyenv to PATH
 export PATH="$HOME/.pyenv/bin:$PATH"
 
@@ -15,8 +24,15 @@ if ! pyenv virtualenvs | grep -q "venv-3.11.5"; then
     pyenv virtualenv 3.11.5 venv-3.11.5
 fi
 
-# Activate the virtual environment
-pyenv activate venv-3.11.5
+# Activate the virtual environment if not already active
+if ! is_venv_active; then
+    pyenv activate venv-3.11.5
+fi
+
+# Check for correct working directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PROJECT_ROOT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT_DIR" # Navigate to the root directory containing pyproject.toml
 
 # Include Poetry installation path in the PATH
 export PATH="$HOME/.local/bin:$PATH"
@@ -90,8 +106,8 @@ datas = collect_data_files('encodings', include_py_files=True) + [
 ]
 
 a = Analysis(
-    ['main.py'],  # Ensure 'main.py' is your entry script
-    pathex=['.'],
+    ['src/main.py'],  # Ensure 'main.py' path is updated
+    pathex=['src'],  # Add 'src' to the path
     binaries=[
         ('build/64All/lib/libpython3.11.so.1.0', 'lib/libpython3.11.so.1.0')
     ],
