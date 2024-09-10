@@ -20,6 +20,7 @@ from yaml import dump
 
 from src.Qt.build_option_utils import add_options_to_layout
 from src.Qt.git_utils import start_cloning, on_repo_selection, load_repos
+from src.logic.romfinder import N64RomValidator
 
 
 class Mario64All(QMainWindow):
@@ -63,6 +64,7 @@ class Mario64All(QMainWindow):
         self.options_widget.setLayout(self.options_layout)
         self.setup_ui()
         self.update_advanced_options()
+        self.rom_region, self.rom_dir = N64RomValidator().find_or_select_file()
 
     def populate_repo_urls(self):
         self.repo_url_combobox.clear()
