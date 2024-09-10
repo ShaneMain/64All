@@ -3,7 +3,7 @@ import os
 from PyQt6.QtCore import QThread
 from yaml import safe_load
 
-from src.logic.gitlogic import CloneWorker, update_branch_menu
+from src.core.gitlogic import CloneWorker, update_branch_menu
 
 
 def start_cloning(obj):

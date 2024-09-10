@@ -18,9 +18,9 @@ from PyQt6.QtWidgets import (
 )
 from yaml import dump
 
-from src.Qt.build_option_utils import add_options_to_layout
-from src.Qt.git_utils import start_cloning, on_repo_selection, load_repos
-from src.logic.romfinder import N64RomValidator
+from src.core.romfinder import N64RomValidator
+from src.ui.build_option_utils import add_options_to_layout
+from src.ui.git_utils import load_repos, on_repo_selection, start_cloning
 
 
 class Mario64All(QMainWindow):
@@ -214,7 +214,7 @@ class Mario64All(QMainWindow):
     def dump_user_selections(self):
         try:
             # Ensure the clone directory exists
-            clone_directory = self.clone_dir_entry.text()
+            clone_directory = os.path.abspath("./.workspace")
             os.makedirs(clone_directory, exist_ok=True)
 
             # Populate the user selections with defaults for missing values
