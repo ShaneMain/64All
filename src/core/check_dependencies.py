@@ -1,197 +1,221 @@
-import os
+import shutil
 import subprocess
 import sys
 
-from PyQt6.QtWidgets import QApplication, QMessageBox, QPushButton, QVBoxLayout, QLabel, QDialog
+import distro
+from PyQt6.QtWidgets import QApplication, QMessageBox
+
+app = QApplication(sys.argv)
 
 
-def get_system_python_version():
-    """Get the version of Python installed on the system."""
-    try:
-        result = subprocess.run(['python3', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if result.returncode != 0:
-            raise RuntimeError("Failed to get Python version")
+def get_required_packages():
+    """Get the required packages and binaries based on the operating system."""
+    return {
+        "apt": {
+            "packages": ["libsdl2-dev", "libglew-dev", "hexdump", "python3"],
+            "binaries": {
+                "hexdump": "hexdump"
+            },  # Key: binary, Value: package containing the binary
+        },
+        "dnf": {
+            "packages": ["SDL2-devel", "glew-devel", "hexdump", "python3"],
+            "binaries": {"hexdump": "hexdump"},
+        },
+        "zypper": {
+            "packages": ["libSDL2-devel", "libGLEW-devel", "hexdump", "python3"],
+            "binaries": {"hexdump": "hexdump"},
+        },
+        "pacman": {
+            "packages": ["sdl2", "glew", "hexdump", "python"],
+            "binaries": {"hexdump": "hexdump"},
+        },
+    }
 
-        version_str = result.stdout.strip()
-        if version_str.startswith("Python "):
-            version_parts = version_str[len("Python "):].split('.')
-            return tuple(map(int, version_parts[:3]))
-        else:
-            raise RuntimeError("Unexpected Python version output")
-    except Exception as e:
-        print(f"Error checking system Python version: {e}")
-        return None
-
-def is_python_version_sufficient(required_version=(3, 6)):
-    """Check if the system Python version is sufficient."""
-    version = get_system_python_version()
-    if version is None:
-        return False
-    return version >= required_version
-
-def is_command_available(command_name):
-    """Check if a command is available in the system's PATH."""
-    return subprocess.run(['which', command_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0
 
 def detect_package_manager():
     """Detect the package manager used by the system."""
-    if os.path.isfile('/usr/bin/apt-get'):
-        return 'apt-get'
-    elif os.path.isfile('/usr/bin/yum'):
-        return 'yum'
-    elif os.path.isfile('/usr/bin/dnf'):
-        return 'dnf'
-    elif os.path.isfile('/usr/bin/zypper'):
-        return 'zypper'
-    elif os.path.isfile('/usr/bin/pacman'):
-        return 'pacman'
+    dist = distro.id()
+    if dist in ["ubuntu", "debian"]:
+        return "apt"
+    elif dist in ["fedora", "centos", "rhel"]:
+        return "dnf"
+    elif dist in ["opensuse"]:
+        return "zypper"
+    elif dist in ["arch"]:
+        return "pacman"
     else:
-        raise RuntimeError("Unsupported package manager")
+        show_message_box(f"Unsupported distribution: {dist}", error=True)
+        return None
 
-def get_required_commands():
-    """Get the required commands based on the package manager."""
-    package_manager = detect_package_manager()
 
-    if package_manager == 'apt-get':
-        return {
-            'libsdl2-dev': 'libsdl2-dev',
-            'libglew-dev': 'libglew-dev',
-            'hexdump': 'hexdump',
-            'python3': 'python3'
-        }
-    elif package_manager == 'yum':
-        return {
-            'libsdl2-devel': 'libsdl2-devel',
-            'glew-devel': 'glew-devel',
-            'hexdump': 'hexdump',
-            'python3': 'python3'
-        }
-    elif package_manager == 'dnf':
-        return {
-            'libsdl2-devel': 'libsdl2-devel',
-            'glew-devel': 'glew-devel',
-            'hexdump': 'hexdump',
-            'python3': 'python3'
-        }
-    elif package_manager == 'zypper':
-        return {
-            'libsdl2-devel': 'libsdl2-devel',
-            'libGLEW-devel': 'libGLEW-devel',
-            'hexdump': 'hexdump',
-            'python3': 'python3'
-        }
-    elif package_manager == 'pacman':
-        return {
-            'sdl2': 'sdl2',
-            'glew': 'glew',
-            'hexdump': 'hexdump',
-            'python': 'python'
-        }
-    else:
-        raise RuntimeError("Unsupported package manager")
-
-def install_packages(packages):
-    """Install a list of packages using sudo and zenity."""
-    package_manager = detect_package_manager()
-
-    if package_manager == 'apt-get':
-        command = ['sudo', 'apt-get', 'install', '-y'] + packages
-    elif package_manager == 'yum':
-        command = ['sudo', 'yum', 'install', '-y'] + packages
-    elif package_manager == 'dnf':
-        command = ['sudo', 'dnf', 'install', '-y'] + packages
-    elif package_manager == 'zypper':
-        command = ['sudo', 'zypper', 'install', '-y'] + packages
-    elif package_manager == 'pacman':
-        command = ['sudo', 'pacman', '-S', '--noconfirm'] + packages
-    else:
-        raise RuntimeError("Unsupported package manager")
-
+def is_package_installed(package_manager, package):
+    """Check if a package is installed using the system's package manager."""
     try:
-        # Prompt for password using zenity
-        zenity_command = ['zenity', '--password', '--title=Authenticate']
-        zenity_process = subprocess.Popen(zenity_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        password = zenity_process.communicate()[0].decode().strip()
+        if package_manager == "apt":
+            result = subprocess.run(
+                ["dpkg", "-l", package], stdout=subprocess.PIPE, text=True
+            )
+        elif package_manager == "dnf" or package_manager == "zypper":
+            result = subprocess.run(
+                ["rpm", "-q", package], stdout=subprocess.PIPE, text=True
+            )
+        elif package_manager == "pacman":
+            result = subprocess.run(
+                ["pacman", "-Qi", package], stdout=subprocess.PIPE, text=True
+            )
+        else:
+            return False
 
-        if zenity_process.returncode != 0:
-            print("User canceled the authentication.")
-            return
+        installed = result.returncode == 0
+        print(
+            f"Package '{package}' is {'installed' if installed else 'not installed'}."
+        )
+        return installed
+    except subprocess.CalledProcessError:
+        print(f"Package '{package}' is not installed due to an error.")
+        return False
 
-        # Run the installation command with sudo
-        env = os.environ.copy()
-        env['SUDO_ASKPASS'] = '/usr/bin/zenity'
 
-        # Construct the sudo command
-        sudo_command = ['sudo', '-A'] + command
+def find_missing_packages_and_binaries(required, package_manager):
+    """Find which required packages and binaries are missing."""
+    missing_packages = [
+        pkg
+        for pkg in required["packages"]
+        if not is_package_installed(package_manager, pkg)
+    ]
 
-        subprocess.run(sudo_command, env=env, check=True)
-        print('Packages installed successfully.')
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to install packages: {e}")
-        sys.exit(1)
+    for binary, package in required["binaries"].items():
+        if shutil.which(binary) is not None:
+            if package in missing_packages:
+                missing_packages.remove(package)
 
-def show_missing_packages_dialog(missing_packages):
-    """Show a dialog to inform the user about missing packages and handle installation."""
-    class InstallDialog(QDialog):
-        def __init__(self, missing_packages, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.setWindowTitle("Missing Packages")
-            self.setModal(True)
-            self.missing_packages = missing_packages  # Store missing packages as an instance variable
-            layout = QVBoxLayout()
+    return missing_packages
 
-            # Information label
-            info_label = QLabel(f"The following packages are missing:\n\n{', '.join(missing_packages)}")
-            layout.addWidget(info_label)
 
-            # Install button
-            install_button = QPushButton("Install", self)
-            install_button.clicked.connect(self.install_packages)
-            layout.addWidget(install_button)
+def confirm_installation(missing_packages):
+    """Ask the user for confirmation to install the missing packages."""
+    msg_box = QMessageBox()
+    msg_box.setIcon(QMessageBox.Icon.Question)
+    msg_box.setText(
+        f"Missing packages detected:\n{', '.join(missing_packages)}\nDo you want to install them?"
+    )
+    msg_box.setWindowTitle("Confirm Installation")
+    msg_box.setStandardButtons(
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+    )
 
-            # Cancel button
-            cancel_button = QPushButton("Cancel", self)
-            cancel_button.clicked.connect(self.reject)
-            layout.addWidget(cancel_button)
+    return msg_box.exec() == QMessageBox.StandardButton.Yes
 
-            self.setLayout(layout)
-            self.setFixedSize(self.sizeHint())
 
-        def install_packages(self):
-            # Perform installation
-            install_packages(self.missing_packages)
-            QMessageBox.information(self, "Success", "All missing packages have been installed.")
-            self.accept()
+def show_message_box(message, error=False):
+    """Show a message box with the given message."""
+    msg_box = QMessageBox()
+    msg_box.setIcon(
+        QMessageBox.Icon.Critical if error else QMessageBox.Icon.Information
+    )
+    msg_box.setText(message)
+    msg_box.setWindowTitle("Error" if error else "Information")
+    msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+    msg_box.exec()
 
-    app = QApplication(sys.argv)
-    dialog = InstallDialog(missing_packages)
-    result = dialog.exec()
-    sys.exit(result)
+
+def elevate_privileges(cmd):
+    """Elevate privileges using zenity and run command."""
+    try:
+        zenity_command = ["zenity", "--password", "--title=Authentication Required"]
+        password = subprocess.run(zenity_command, capture_output=True, text=True)
+        password = password.stdout.strip()
+
+        if password:
+            echo_cmd = ["echo", password]
+            sudo_cmd = ["sudo", "-S"] + cmd
+            echo_proc = subprocess.Popen(echo_cmd, stdout=subprocess.PIPE)
+            result = subprocess.run(sudo_cmd, stdin=echo_proc.stdout)
+            return result
+        else:
+            raise RuntimeError("No password provided for elevation.")
+    except Exception as e:
+        show_message_box(f"Failed to elevate privileges: {e}", error=True)
+        return None
+
+
+def install_missing_packages(package_manager, missing_packages):
+    """Install the missing packages using the system's package manager."""
+    if package_manager == "apt":
+        cmd = ["apt", "install", "-y"] + missing_packages
+    elif package_manager == "dnf":
+        cmd = ["dnf", "install", "-y"] + missing_packages
+    elif package_manager == "zypper":
+        cmd = ["zypper", "--non-interactive", "install"] + missing_packages
+    elif package_manager == "pacman":
+        cmd = ["pacman", "-S", "--noconfirm"] + missing_packages
+    else:
+        show_message_box("Unsupported package manager detected.", error=True)
+        return
+
+    result = elevate_privileges(cmd)
+    if result and result.returncode == 0:
+        show_message_box("Packages installed successfully.")
+    else:
+        show_message_box(
+            f"Failed to install packages with error code: {result.returncode if result else 'unknown'}",
+            error=True,
+        )
+
 
 def check_and_install():
-    """Check for required packages and install them if missing."""
-    required_python_version = (3, 6)
+    """Main function to run the package check and install process."""
+    try:
+        package_manager = detect_package_manager()
+        if not package_manager:
+            show_message_box(
+                "Could not verify required packages. You may not be able to build."
+            )
+            print("No package manager detected. Exiting.")
+            return
 
-    if not is_python_version_sufficient(required_version=required_python_version):
-        print(f"Python {'.'.join(map(str, required_python_version))} or greater is required.")
-        print("Attempting to install Python and other required packages...")
-        required_packages = get_required_commands()
-        install_packages([pkg for cmd, pkg in required_packages.items()])
-        # Recheck Python version after installation
-        if not is_python_version_sufficient(required_version=required_python_version):
-            print("Failed to install the required Python version.")
-            sys.exit(1)
+        print(f"Detected package manager: {package_manager}")
 
-    required_commands = get_required_commands()
+        required = get_required_packages().get(package_manager, {})
+        missing_packages = find_missing_packages_and_binaries(required, package_manager)
+        if not required:
+            print(
+                f"No required packages mapping for package manager: {package_manager}"
+            )
+            return
 
-    # Check if each required command is available
-    missing_commands = [cmd for cmd, pkg in required_commands.items() if not is_command_available(cmd)]
+        if missing_packages:
+            print(f"Missing packages detected: {missing_packages}")
 
-    if missing_commands:
-        print("Some required commands are missing.")
-        show_missing_packages_dialog([required_commands[cmd] for cmd in missing_commands])
-    else:
-        print("All required commands are available.")
+            # Confirm installation
+            if confirm_installation(missing_packages):
+                install_missing_packages(package_manager, missing_packages)
+                if missing_packages:
+                    show_message_box(
+                        "Installation failed or user cancelled. You will not be able to build."
+                    )
+            else:
+                show_message_box(
+                    "Installation cancelled by user. You will not be able to build."
+                )
+
+        else:
+            print("All required packages are installed.")
+
+        print("check_and_install finished successfully.")
+    except Exception as e:
+        show_message_box(f"An error occurred: {e}", error=True)
+        print(f"An error occurred during check_and_install: {e}")
+
 
 if __name__ == "__main__":
+    print("Starting application...")
+
+    if shutil.which("zenity") is None:
+        print("Zenity is not installed. Please install it and try again.")
+        show_message_box(
+            "Zenity is not installed. Please install it and try again.", error=True
+        )
+        sys.exit(1)
+
     check_and_install()
