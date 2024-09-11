@@ -31,6 +31,7 @@ def start_cloning(obj):
     obj.worker_thread = thread
     obj.worker = worker
 
+
 def load_repos(obj):
     current_directory = os.path.dirname(os.path.abspath(__file__))
     yaml_file = os.path.join(current_directory, "../..", "config", "repos.yaml")
@@ -42,6 +43,7 @@ def load_repos(obj):
             obj.populate_repo_urls()
     except Exception as error:
         print(f"Error loading YAML file: {error}")
+
 
 def on_repo_selection(obj):
     repo_name = obj.repo_url_combobox.currentText()
