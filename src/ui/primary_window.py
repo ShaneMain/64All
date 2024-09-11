@@ -14,10 +14,14 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QVBoxLayout,
     QHBoxLayout,
-    QSizePolicy, QLabel, QComboBox, QCheckBox,
+    QSizePolicy,
+    QLabel,
+    QComboBox,
+    QCheckBox,
 )
 from yaml import dump
 
+from core.buildlogic import symlink_file_to_dir, run_make
 from src.core.romfinder import N64RomValidator
 from src.ui.build_option_utils import add_options_to_layout
 from src.ui.git_utils import load_repos, on_repo_selection, start_cloning
@@ -161,9 +165,19 @@ class Mario64All(QMainWindow):
         self.main_layout.addLayout(horizontal_layout)
         return horizontal_layout
 
+    def start_building(self):
+        symlink_file_to_dir(
+            self.rom_dir,
+            os.path.abspath("./.workspace"),
+            f"baserom.{self.rom_region}.z64",
+        )
+        run_make(os.path.abspath("./.workspace"))
+
     def connect_signals(self):
         self.advanced_checkbox.stateChanged.connect(self.update_advanced_options)
-        self.repo_url_combobox.currentIndexChanged.connect(lambda _: on_repo_selection(self))
+        self.repo_url_combobox.currentIndexChanged.connect(
+            lambda _: on_repo_selection(self)
+        )
         self.browse_button.clicked.connect(self.browse_directory)
         self.clone_button.clicked.connect(lambda _: start_cloning(self))
 
@@ -210,6 +224,7 @@ class Mario64All(QMainWindow):
             return
         self.output_text.append("Cloning finished!")
         self.dump_user_selections()
+        self.start_building()
 
     def dump_user_selections(self):
         try:
