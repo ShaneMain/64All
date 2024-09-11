@@ -74,28 +74,30 @@ export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
 
 echo "Creating spec file..."
 cat << 'EOF' > 64All.spec
+# Imports and necessary utilities
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 import PyQt6
 import os
 import modulegraph.modulegraph
-from PyInstaller.utils.hooks import collect_data_files
 
-block_cipher = None
 
+# Helper function to find all imports
 def find_all_imports(entry_point):
     mg = modulegraph.modulegraph.ModuleGraph()
     mg.run_script(entry_point)
     return mg
 
-# Entry point of your application
-entry_point = 'src/main.py'
+
+# Entry point of the application
+entry_point = "src/main.py"
 mg = find_all_imports(entry_point)
 
 # Collect the necessary imports from `src.main`
 my_package_hiddenimports = [
     node.identifier
     for node in mg.flatten()
-    if node.identifier.startswith('src.main') and not node.identifier.endswith('__init__')
+    if node.identifier.startswith("src.main")
+    and not node.identifier.endswith("__init__")
 ]
 
 block_cipher = None
@@ -105,21 +107,25 @@ binaries = []
 datas = []
 
 # Collect data files from the src directory
-my_package_datas = collect_data_files('src')
+my_package_datas = collect_data_files("src")
 datas.extend(my_package_datas)
 
 # Include your YAML file using a relative path
-datas.append(('./config/repos.yaml', 'config'))
+datas.append(("./config/repos.yaml", "config"))
 
 # Predefined paths for PyQt6 plugins
-qt_plugins_path = os.path.join(os.path.dirname(PyQt6.__file__), 'Qt6', 'plugins')
+qt_plugins_path = os.path.join(os.path.dirname(PyQt6.__file__), "Qt6", "plugins")
 
 # Include the entry point of your application explicitly
-datas.append((os.path.join('src', 'main.py'), '.'))
+datas.append((os.path.join("src", "main.py"), "."))
 
+# Import Analysis, EXE, PYZ, and COLLECT from PyInstaller's build module
+from PyInstaller.building.build_main import Analysis, EXE, PYZ, COLLECT
+
+# Define the Analysis instance
 a = Analysis(
-    ['src/main.py'],  # Entry point of your application
-    pathex=['src'],
+    ["src/main.py"],  # Entry point of your application
+    pathex=["src"],
     binaries=binaries,
     datas=datas,
     hiddenimports=my_package_hiddenimports,
@@ -127,12 +133,10 @@ a = Analysis(
     noarchive=False,
 )
 
-pyz = PYZ(
-    a.pure,
-    a.zipped_data,
-    cipher=block_cipher
-)
+# Create the PYZ archive
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# Create the EXE instance
 exe = EXE(
     pyz,
     a.scripts,
@@ -147,20 +151,22 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,
-    onefile=True
+    onefile=True,
 )
 
+# Collect all components into a single package
 coll = COLLECT(
     exe,
     a.binaries,
     a.zipfiles,
     a.datas,
-    strip=True,  # Strip debug symbols
-    upx=True,  # Enable UPX compression
+    strip=True,
+    upx=True,
     upx_exclude=[],
-    name='64AllCollection',
+    name="64AllCollection",  # Replace with your project name
 )
 EOF
+
 
 echo "Creating the executable..."
 poetry run pyinstaller 64All.spec
