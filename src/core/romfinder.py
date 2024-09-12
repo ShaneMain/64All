@@ -1,5 +1,6 @@
 import hashlib
 import os
+import sys
 import time
 
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
@@ -80,7 +81,7 @@ def _prompt_user_for_file():
         selected_files = dialog.selectedFiles()
         if selected_files:
             return selected_files[0]  # Return the first (and only) selected file
-    return None
+    sys.exit()
 
 
 def get_key_from_value(dictionary, value):
