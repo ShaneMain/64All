@@ -1,7 +1,7 @@
 import os
 import sys
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -21,7 +21,8 @@ from PyQt6.QtWidgets import (
 )
 from yaml import dump
 
-from core.buildlogic import symlink_file_to_dir, run_make
+from core.buildlogic import copy_file_to_dir, run_make
+from core.gitlogic import CloneWorker
 from src.core.romfinder import N64RomValidator
 from src.ui.build_option_utils import add_options_to_layout
 from src.ui.git_utils import load_repos, on_repo_selection, start_cloning
@@ -30,6 +31,8 @@ from src.ui.git_utils import load_repos, on_repo_selection, start_cloning
 class Mario64All(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.workspace = os.path.abspath("./.workspace")
+
         self.branch_collection = None
         self.directory_collection = None
         self.fork_collection = None
@@ -55,7 +58,8 @@ class Mario64All(QMainWindow):
         self.REPOS = []
         self.repo_options = {}
         self.user_selections = {}
-        self.clone_worker = None
+        self.clone_worker = CloneWorker()
+        self.worker_thread = QThread()
 
         self.browse_button = QPushButton("Browse...", self)
         self.clone_button = QPushButton("Clone", self)
@@ -166,7 +170,7 @@ class Mario64All(QMainWindow):
         return horizontal_layout
 
     def start_building(self):
-        symlink_file_to_dir(
+        copy_file_to_dir(
             self.rom_dir,
             os.path.abspath("./.workspace"),
             f"baserom.{self.rom_region}.z64",

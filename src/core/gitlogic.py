@@ -48,30 +48,27 @@ class CloneWorker(QObject):
     text_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(bool)  # Emit a bool indicating success or failure
 
-    def __init__(self, repo_url, clone_dir, branch):
+    def __init__(self):
         super().__init__()
-        self.repo_url = repo_url
-        self.clone_dir = clone_dir
-        self.branch = branch
 
-    def run(self):
+    def run(self, repo_url, clone_dir, branch):
         try:
-            os.makedirs(self.clone_dir, exist_ok=True)
-            if not self.branch:
+            os.makedirs(clone_dir, exist_ok=True)
+            if not branch:
                 raise ValueError(
                     "Branch is not specified. Please select a valid branch."
                 )
 
             clone_progress = CloneProgress(self.text_signal, self.progress_signal)
             self.text_signal.emit(
-                f"Cloning repository from {self.repo_url} (branch: {self.branch}) to {self.clone_dir}...\n"
+                f"Cloning repository from {repo_url} (branch: {branch}) to {clone_dir}...\n"
             )
 
             git.Repo.clone_from(
-                self.repo_url,
-                self.clone_dir,
+                repo_url,
+                clone_dir,
                 progress=clone_progress,
-                branch=self.branch,
+                branch=branch,
                 depth=1,  # Perform shallow clone
                 single_branch=True,  # Clone only the specified branch
             )
@@ -90,7 +87,7 @@ class CloneWorker(QObject):
             self.text_signal.emit(
                 f"Full Command: {e.command}\nOutput:\n{e.stdout}\nError Output:\n{e.stderr}\n"
             )
-            self.clean_up_directory()
+            self.clean_up_directory(clone_dir)
             self.terminate_thread(False)
         except ValueError as e:
             self.text_signal.emit(f"An error occurred: {e}\n")
@@ -100,23 +97,21 @@ class CloneWorker(QObject):
             self.text_signal.emit(
                 f"An unexpected error occurred while cloning the repository: {e}\n"
             )
-            self.clean_up_directory()
+            self.clean_up_directory(clone_dir)
             self.terminate_thread(False)
 
     def terminate_thread(self, success):
         # Emit the finished signal to indicate the task is complete and should terminate the thread
         self.finished_signal.emit(success)
 
-    def clean_up_directory(self):
+    def clean_up_directory(self, clone_dir):
         try:
-            if os.path.exists(self.clone_dir):
-                shutil.rmtree(self.clone_dir)
-                self.text_signal.emit(f"Cleaned up directory '{self.clone_dir}'.\n")
+            if os.path.exists(clone_dir):
+                shutil.rmtree(clone_dir)
+                self.text_signal.emit(f"Cleaned up directory '{clone_dir}'.\n")
                 self.run()
         except Exception as e:
-            self.text_signal.emit(
-                f"Error cleaning up directory '{self.clone_dir}': {e}\n"
-            )
+            self.text_signal.emit(f"Error cleaning up directory '{clone_dir}': {e}\n")
 
 
 def update_branch_menu(repo_name, repos, branch_menu: QComboBox):
@@ -138,7 +133,9 @@ def update_branch_menu(repo_name, repos, branch_menu: QComboBox):
         default_branch = (
             "master"
             if "master" in branches
-            else "main" if "main" in branches else branches[0]
+            else "main"
+            if "main" in branches
+            else branches[0]
         )
 
         branch_menu.clear()

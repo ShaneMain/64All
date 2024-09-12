@@ -3,7 +3,8 @@ import subprocess
 import sys
 
 import distro
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QMessageBox, QProgressDialog
 
 app = QApplication(sys.argv)
 
@@ -119,48 +120,81 @@ def show_message_box(message, error=False):
     msg_box.exec()
 
 
-def elevate_privileges(cmd):
+def check_sudo_password(password=None):
+    """Check if sudo requires a password."""
+    check_cmd = ["sudo", "ls"]
+    result = subprocess.run(check_cmd, capture_output=True, input=password)
+    return result.returncode == 0
+
+
+def show_progress_dialog(message):
+    app = QApplication.instance() or QApplication(sys.argv)
+    progress_dialog = QProgressDialog(message, None, 0, 0)
+    progress_dialog.setWindowTitle("Please wait")
+    progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+    progress_dialog.setCancelButton(None)
+    progress_dialog.setMinimumDuration(0)
+    progress_dialog.show()
+    return progress_dialog
+
+
+def close_progress_dialog(progress_dialog):
+    progress_dialog.cancel()
+    QApplication.processEvents()
+
+
+def elevate_privileges(cmd, message="Authentication Required"):
     """Elevate privileges using zenity and run command."""
-    try:
-        zenity_command = ["zenity", "--password", "--title=Authentication Required"]
-        password = subprocess.run(zenity_command, capture_output=True, text=True)
-        password = password.stdout.strip()
-
-        if password:
-            echo_cmd = ["echo", password]
-            sudo_cmd = ["sudo", "-S"] + cmd
-            echo_proc = subprocess.Popen(echo_cmd, stdout=subprocess.PIPE)
-            result = subprocess.run(sudo_cmd, stdin=echo_proc.stdout)
-            return result
-        else:
-            raise RuntimeError("No password provided for elevation.")
-    except Exception as e:
-        show_message_box(f"Failed to elevate privileges: {e}", error=True)
+    # Check if sudo requires a password
+    if check_sudo_password(None):
         return None
+    while True:
+        # Prompt for password using Zenity
+        zenity_command = ["zenity", "--password", f"--title={message}"]
+        password_proc = subprocess.run(zenity_command, capture_output=True, text=True)
+        password = password_proc.stdout.strip()
+
+        # Check if the provided password is correct
+        if check_sudo_password(password):
+            return password
+        else:
+            show_message_box("Incorrect password!", error=True)
 
 
-def install_missing_packages(package_manager, missing_packages):
+def install_packages(packages, package_manager=None):
     """Install the missing packages using the system's package manager."""
-    if package_manager == "apt":
-        cmd = ["apt", "install", "-y"] + missing_packages
-    elif package_manager == "dnf":
-        cmd = ["dnf", "install", "-y"] + missing_packages
-    elif package_manager == "zypper":
-        cmd = ["zypper", "--non-interactive", "install"] + missing_packages
-    elif package_manager == "pacman":
-        cmd = ["pacman", "-S", "--noconfirm"] + missing_packages
-    else:
-        show_message_box("Unsupported package manager detected.", error=True)
-        return
+    show_message_box(
+        f'The following required packages will be installed: {" ".join(packages)}'
+    )
 
-    result = elevate_privileges(cmd)
+    if package_manager is None:
+        package_manager = detect_package_manager()
+
+    match package_manager:
+        case "apt":
+            cmd = ["apt", "install", "-y"] + packages
+        case "dnf":
+            cmd = ["dnf", "install", "-y"] + packages
+        case "zypper":
+            cmd = ["zypper", "--non-interactive", "install"] + packages
+        case "pacman":
+            cmd = ["pacman", "-S", "--noconfirm"] + packages
+        case _:
+            show_message_box("Unsupported package manager detected.", error=True)
+            return
+
+    password = elevate_privileges(cmd)
+
+    result = subprocess.run(["sudo", "-S"] + cmd, input=password, text=True, check=True)
     if result and result.returncode == 0:
         show_message_box("Packages installed successfully.")
+        return True
     else:
         show_message_box(
             f"Failed to install packages with error code: {result.returncode if result else 'unknown'}",
             error=True,
         )
+        return False
 
 
 def check_and_install():
@@ -189,7 +223,7 @@ def check_and_install():
 
             # Confirm installation
             if confirm_installation(missing_packages):
-                install_missing_packages(package_manager, missing_packages)
+                install_packages(missing_packages, package_manager)
                 if missing_packages:
                     show_message_box(
                         "Installation failed or user cancelled. You will not be able to build."
@@ -209,13 +243,5 @@ def check_and_install():
 
 
 if __name__ == "__main__":
-    print("Starting application...")
-
-    if shutil.which("zenity") is None:
-        print("Zenity is not installed. Please install it and try again.")
-        show_message_box(
-            "Zenity is not installed. Please install it and try again.", error=True
-        )
-        sys.exit(1)
-
+    elevate_privileges(["ls"])
     check_and_install()

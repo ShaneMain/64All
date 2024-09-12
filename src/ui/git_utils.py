@@ -1,9 +1,8 @@
 import os
 
-from PyQt6.QtCore import QThread
 from yaml import safe_load
 
-from src.core.gitlogic import CloneWorker, update_branch_menu
+from src.core.gitlogic import update_branch_menu
 
 
 def start_cloning(obj):
@@ -11,25 +10,21 @@ def start_cloning(obj):
     repo_url = obj.repo_url
 
     # Create worker and thread locally
-    worker = CloneWorker(repo_url, os.path.abspath("./.workspace"), branch)
-    thread = QThread()
+    worker = obj.clone_worker
+    thread = obj.worker_thread
     worker.moveToThread(thread)
 
     worker.progress_signal.connect(obj.update_progress_bar)
     worker.text_signal.connect(obj.update_output_text)
     worker.finished_signal.connect(lambda success: obj.cloning_finished(success))
 
-    thread.started.connect(worker.run)
+    thread.started.connect(worker.run(repo_url, obj.workspace, branch))
     worker.finished_signal.connect(thread.quit)
     worker.finished_signal.connect(worker.deleteLater)
     thread.finished.connect(thread.deleteLater)
 
     print("Starting cloning process...")
     thread.start()
-
-    # Reference to keep thread and worker alive
-    obj.worker_thread = thread
-    obj.worker = worker
 
 
 def load_repos(obj):
