@@ -76,6 +76,7 @@ class CloneWorker(QObject):
 
             # Emit finished signal with success status
             self.finished_signal.emit(True)
+            self.terminate_thread(True)
 
         except FileExistsError as e:
             self.text_signal.emit(f"Warning: {e}\n")
@@ -87,7 +88,7 @@ class CloneWorker(QObject):
             self.text_signal.emit(
                 f"Full Command: {e.command}\nOutput:\n{e.stdout}\nError Output:\n{e.stderr}\n"
             )
-            self.clean_up_directory(clone_dir)
+            self.clean_up_directory(repo_url, clone_dir, branch)
             self.terminate_thread(False)
         except ValueError as e:
             self.text_signal.emit(f"An error occurred: {e}\n")
@@ -97,19 +98,19 @@ class CloneWorker(QObject):
             self.text_signal.emit(
                 f"An unexpected error occurred while cloning the repository: {e}\n"
             )
-            self.clean_up_directory(clone_dir)
+            self.clean_up_directory(repo_url, clone_dir, branch)
             self.terminate_thread(False)
 
     def terminate_thread(self, success):
         # Emit the finished signal to indicate the task is complete and should terminate the thread
         self.finished_signal.emit(success)
 
-    def clean_up_directory(self, clone_dir):
+    def clean_up_directory(self, repo_url, clone_dir, branch):
         try:
             if os.path.exists(clone_dir):
                 shutil.rmtree(clone_dir)
                 self.text_signal.emit(f"Cleaned up directory '{clone_dir}'.\n")
-                self.run()
+                self.run(repo_url, clone_dir, branch)
         except Exception as e:
             self.text_signal.emit(f"Error cleaning up directory '{clone_dir}': {e}\n")
 

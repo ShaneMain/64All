@@ -1,10 +1,16 @@
+import os
+
+import yaml
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QCheckBox, QLabel, QComboBox
+
+selections = {}
 
 
 def add_options_to_layout(obj, repo_options):
     dropdowns = []
     checkboxes = []
+    obj.repo_options = repo_options
 
     for opt_name, opt_info in repo_options.items():
         if "values" not in opt_info:
@@ -12,37 +18,33 @@ def add_options_to_layout(obj, repo_options):
 
         if not opt_info.get("advanced") or obj.advanced_checkbox.isChecked():
             tooltip_text = opt_info.get("description", "")
+            default_value = opt_info.get("recommended", opt_info.get("default", ""))
 
             if (
-                    isinstance(opt_info["values"], list)
-                    and len(opt_info["values"]) == 2
-                    and 0 in opt_info["values"]
+                isinstance(opt_info["values"], list)
+                and len(opt_info["values"]) == 2
+                and 0 in opt_info["values"]
             ):
                 checkbox = QCheckBox(f"{opt_name}:", obj)
                 checkbox.setCheckState(
-                    Qt.CheckState.Checked
-                    if opt_info.get("default", 0)
-                    else Qt.CheckState.Unchecked
-                )
-                checkbox.stateChanged.connect(
-                    obj.create_checkbox_handler(opt_name)
+                    Qt.CheckState.Checked if default_value else Qt.CheckState.Unchecked
                 )
                 checkbox.setToolTip(tooltip_text)
+                checkbox.stateChanged.connect(create_checkbox_handler(opt_name))
                 checkboxes.append((opt_name, checkbox))
+                selections[opt_name] = checkbox.isChecked()
             else:
                 combobox_label = QLabel(f"{opt_name}:", obj)
                 combobox_label.setToolTip(tooltip_text)
                 combobox = QComboBox(obj)
                 combobox.addItems([str(value) for value in opt_info["values"]])
-                combobox.setCurrentText(str(opt_info.get("default", "")))
-                combobox.currentTextChanged.connect(
-                    obj.create_combobox_handler(opt_name)
-                )
+                combobox.setCurrentText(str(default_value))
                 combobox.setToolTip(tooltip_text)
+                combobox.currentTextChanged.connect(create_combobox_handler(opt_name))
                 dropdowns.append((combobox_label, combobox))
+                selections[opt_name] = combobox.currentText()
 
     row, col = 0, 0
-
     for label, combobox in dropdowns:
         obj.options_layout.addWidget(label, row, col, 1, 1)
         obj.options_layout.addWidget(combobox, row, col + 1, 1, 1)
@@ -60,7 +62,6 @@ def add_options_to_layout(obj, repo_options):
             row += 1
             col = 0
 
-    # Adjust the window height based on the number of rows used
     adjust_window_height(obj, row)
 
 
@@ -75,3 +76,49 @@ def adjust_window_height(obj, num_rows):
     obj.setFixedSize(675, new_height)
 
 
+def dump_user_selections(obj):
+    try:
+        # Ensure the clone directory exists
+        clone_directory = obj.workspace
+        os.makedirs(clone_directory, exist_ok=True)
+
+        # Filter selections to only include those that are not default
+        non_default_selections = {}
+        for opt_name, opt_info in obj.repo_options.items():
+            # Ensure we get sensible default values
+            recommended_value = opt_info.get("recommended")
+            default_value = (
+                opt_info.get("default")
+                if recommended_value is None
+                else recommended_value
+            )
+
+            # Get the current selection
+            current_value = selections.get(opt_name)
+
+            # Compare current value with the defaults (consider bool/int conversions as well)
+            if current_value is not None and str(current_value) != str(default_value):
+                non_default_selections[opt_name] = current_value
+
+        # Write to the YAML file
+        selections_file = os.path.join(clone_directory, ".user_selections.yaml")
+        with open(selections_file, "w") as file:
+            yaml.dump(non_default_selections, file)
+
+        obj.output_text.append(f"User selections saved to {selections_file}.")
+    except Exception as error:
+        obj.output_text.append(f"Error saving selections: {error}")
+
+
+def create_checkbox_handler(opt_name):
+    def handler(state):
+        selections[opt_name] = state == Qt.CheckState.Checked
+
+    return handler
+
+
+def create_combobox_handler(opt_name):
+    def handler(value):
+        selections[opt_name] = value
+
+    return handler

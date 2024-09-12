@@ -19,12 +19,14 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QCheckBox,
 )
-from yaml import dump
 
 from core.buildlogic import copy_file_to_dir, run_make
 from core.gitlogic import CloneWorker
 from src.core.romfinder import N64RomValidator
-from src.ui.build_option_utils import add_options_to_layout
+from src.ui.build_option_utils import (
+    add_options_to_layout,
+    dump_user_selections,
+)
 from src.ui.git_utils import load_repos, on_repo_selection, start_cloning
 
 
@@ -172,10 +174,10 @@ class Mario64All(QMainWindow):
     def start_building(self):
         copy_file_to_dir(
             self.rom_dir,
-            os.path.abspath("./.workspace"),
+            self.workspace,
             f"baserom.{self.rom_region}.z64",
         )
-        run_make(os.path.abspath("./.workspace"))
+        run_make(self.workspace)
 
     def connect_signals(self):
         self.advanced_checkbox.stateChanged.connect(self.update_advanced_options)
@@ -227,33 +229,8 @@ class Mario64All(QMainWindow):
         if not success:
             return
         self.output_text.append("Cloning finished!")
-        self.dump_user_selections()
+        dump_user_selections(self)
         self.start_building()
-
-    def dump_user_selections(self):
-        try:
-            # Ensure the clone directory exists
-            clone_directory = os.path.abspath("./.workspace")
-            os.makedirs(clone_directory, exist_ok=True)
-
-            # Populate the user selections with defaults for missing values
-            populated_selections = {}
-            for opt_name, opt_info in self.repo_options.items():
-                if opt_name in self.user_selections:
-                    # Use the user selection
-                    populated_selections[opt_name] = self.user_selections[opt_name]
-                else:
-                    # Use the default value
-                    populated_selections[opt_name] = opt_info.get("default", "")
-
-            # Write to the YAML file
-            selections_file = os.path.join(clone_directory, ".user_selections.yaml")
-            with open(selections_file, "w") as file:
-                dump(populated_selections, file)
-
-            self.output_text.append(f"User selections saved to {selections_file}.")
-        except Exception as error:
-            self.output_text.append(f"Error saving selections: {error}")
 
 
 if __name__ == "__main__":
