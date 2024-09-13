@@ -1,12 +1,18 @@
 import os
 import shutil
 import subprocess
+import sys
 
 from core.dependency_utils import install_packages
 
 
 class DistroboxManager:
-    def __init__(self, box_name: str, image: str = "docker.io/library/fedora:latest"):
+    def __init__(
+        self,
+        box_name: str,
+        image: str = "registry.fedoraproject.org/fedora-toolbox:latest",
+    ):
+        self.created = False
         self.box_name = box_name
         self.image = image
         self.bin_folder = os.path.expanduser("~/.local/bin")
@@ -64,53 +70,62 @@ class DistroboxManager:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            input="Y",
         )
         if result.returncode == 0:
             print(f"Distrobox container '{self.box_name}' created successfully.")
+            self.created = True
         else:
             raise RuntimeError(
                 f"Failed to create Distrobox container '{self.box_name}'. Error: {result.stderr}"
             )
 
-    def enter(self):
-        """Enter the Distrobox container."""
-        enter_command = f"distrobox-enter --name {self.box_name}"
-        subprocess.run(enter_command, shell=True)
-
-    def run_command_in_box(self, command: str):
+    def run_command_in_box(self, command: str, ephemeral: bool = False):
+        original_name = self.box_name
+        if ephemeral:
+            self.box_name += "_ephemeral ephemeral"
         """Run a command inside the Distrobox container."""
-        run_command = f'distrobox-enter --name {self.box_name} -- "{command}"'
-        result = subprocess.run(
+        if not self.created:
+            self.create()
+
+        run_command = f"distrobox-enter --name {self.box_name} -- {command}"
+        process = subprocess.Popen(
             run_command,
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
-        if result.returncode == 0:
-            return result.stdout.strip()
+
+        # Stream outputs to the console
+        for stdout_line in iter(process.stdout.readline, ""):
+            print(stdout_line, end="")
+        for stderr_line in iter(process.stderr.readline, ""):
+            print(stderr_line, end="", file=sys.stderr)
+
+        process.stdout.close()
+        process.stderr.close()
+        returncode = process.wait()
+
+        if ephemeral:
+            self.created = False
+
+        if returncode == 0:
+            print("Command completed successfully")
+            self.box_name = original_name
         else:
-            print(f"An error occurred: {result.stderr.strip()}")
-            return None
+            print(f"An error occurred with return code {returncode}")
+
+        return returncode
 
 
 if __name__ == "__main__":
-    """
     # Example usage:
-    manager = DistroboxManager(box_name="mydistrobox")
-
-    # Create a Distrobox container
-    manager.create()
-
-    # Enter the Distrobox container
-    try:
-        print("Entering the Distrobox container...")
-        manager.enter()
-    except KeyboardInterrupt:
-        print("Exited the Distrobox container.")
+    manager = DistroboxManager(box_name="test")
 
     # Run a command inside the Distrobox container
-    output = manager.run_command_in_box("echo 'Hello from inside Distrobox!'")
+    output = manager.run_command_in_box(
+        "sudo dnf update -y && sudo dnf install neofetch -y && neofetch", True
+    )
     if output:
         print(output)
-    """
