@@ -1,7 +1,7 @@
 import os
 import sys
 
-from PyQt6.QtCore import Qt, QThread
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -21,20 +21,21 @@ from PyQt6.QtWidgets import (
 )
 
 from core.buildlogic import copy_file_to_dir, run_make
-from core.gitlogic import CloneWorker
 from src.core.romfinder import N64RomValidator
 from src.ui.build_option_utils import (
     add_options_to_layout,
     dump_user_selections,
 )
-from src.ui.git_utils import load_repos, on_repo_selection, start_cloning
 
 
 class Mario64All(QMainWindow):
+    ui_initialize_started_signal = pyqtSignal()
+    ui_initialized_signal = pyqtSignal()
+    instance_initialized = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.workspace = os.path.abspath("./.workspace")
-
         self.branch_collection = None
         self.directory_collection = None
         self.fork_collection = None
@@ -56,11 +57,11 @@ class Mario64All(QMainWindow):
         self.output_text = QTextEdit(self)
         self.progress_bar = QProgressBar(self)
         self.advanced_checkbox = QCheckBox("Show advanced options")
+        self.clone_worker = None
 
         self.REPOS = []
         self.repo_options = {}
         self.user_selections = {}
-        self.clone_worker = CloneWorker()
         self.worker_thread = QThread()
 
         self.browse_button = QPushButton("Browse...", self)
@@ -72,9 +73,8 @@ class Mario64All(QMainWindow):
             5
         )  # Set the spacing between elements in options layout
         self.options_widget.setLayout(self.options_layout)
-        self.setup_ui()
-        self.update_advanced_options()
         self.rom_region, self.rom_dir = N64RomValidator().find_or_select_file()
+        self.setup_ui()
 
     def populate_repo_urls(self):
         self.repo_url_combobox.clear()
@@ -82,7 +82,6 @@ class Mario64All(QMainWindow):
             self.repo_url_combobox.addItem(repo["name"])
 
     def setup_ui(self):
-        load_repos(self)
         self.connect_signals()
 
         self.output_text.setFixedHeight(200)
@@ -149,8 +148,6 @@ class Mario64All(QMainWindow):
             self.options_widget, alignment=Qt.AlignmentFlag.AlignTop
         )
 
-        on_repo_selection(self)
-
     def add_horizontal_widgets(self, *widgets_with_policies):
         horizontal_layout = QHBoxLayout()
         horizontal_layout.setContentsMargins(0, 0, 0, 0)  # Remove horizontal margins
@@ -181,11 +178,7 @@ class Mario64All(QMainWindow):
 
     def connect_signals(self):
         self.advanced_checkbox.stateChanged.connect(self.update_advanced_options)
-        self.repo_url_combobox.currentIndexChanged.connect(
-            lambda _: on_repo_selection(self)
-        )
         self.browse_button.clicked.connect(self.browse_directory)
-        self.clone_button.clicked.connect(lambda _: start_cloning(self))
 
     def update_build_options(self, repo_options):
         for i in reversed(range(self.options_layout.count())):
@@ -234,7 +227,10 @@ class Mario64All(QMainWindow):
 
 
 if __name__ == "__main__":
+    from ui.git_utils import connect_signals
+
     app = QApplication(sys.argv)
     window = Mario64All()
+    connect_signals(window)
     window.show()
     sys.exit(app.exec())
