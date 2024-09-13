@@ -1,3 +1,4 @@
+import asyncio
 import os
 import shutil
 import subprocess
@@ -10,7 +11,7 @@ class DistroboxManager:
     def __init__(
         self,
         box_name: str,
-        image: str = "registry.fedoraproject.org/fedora-toolbox:latest",
+        image: str = "ubuntu:latest",
     ):
         self.created = False
         self.box_name = box_name
@@ -80,32 +81,41 @@ class DistroboxManager:
                 f"Failed to create Distrobox container '{self.box_name}'. Error: {result.stderr}"
             )
 
-    def run_command_in_box(self, command: str, ephemeral: bool = False):
+    async def run_command_in_box(self, command: str, ephemeral: bool = False):
+        """Run a command inside the Distrobox container asynchronously."""
         original_name = self.box_name
         if ephemeral:
             self.box_name += "_ephemeral ephemeral"
-        """Run a command inside the Distrobox container."""
         if not self.created:
             self.create()
 
-        run_command = f"distrobox-enter --name {self.box_name} -- {command}"
-        process = subprocess.Popen(
-            run_command,
+        subprocess.run(
+            f"distrobox-enter --name {self.box_name}",
             shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            check=True,
             text=True,
+            capture_output=True,
+        )
+        process = await asyncio.create_subprocess_shell(
+            command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
 
-        # Stream outputs to the console
-        for stdout_line in iter(process.stdout.readline, ""):
-            print(stdout_line, end="")
-        for stderr_line in iter(process.stderr.readline, ""):
-            print(stderr_line, end="", file=sys.stderr)
+        async def stream_output(stream, stream_name):
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                if stream_name == "stdout":
+                    print(line.decode().strip())
+                else:
+                    print(line.decode().strip(), file=sys.stderr)
 
-        process.stdout.close()
-        process.stderr.close()
-        returncode = process.wait()
+        await asyncio.gather(
+            stream_output(process.stdout, "stdout"),
+            stream_output(process.stderr, "stderr"),
+        )
+
+        returncode = await process.wait()
 
         if ephemeral:
             self.created = False
@@ -117,6 +127,20 @@ class DistroboxManager:
             print(f"An error occurred with return code {returncode}")
 
         return returncode
+
+
+async def run_ephemeral_command(command: str):
+    distro_manager = DistroboxManager("ephemeral_runner")
+    await distro_manager.run_command_in_box(command, True)
+    #   podman rmi $(podman images -q)
+
+
+if __name__ == "__main__":
+    asyncio.run(
+        run_ephemeral_command(
+            "sudo dnf update -y && sudo dnf install neofetch -y && neofetch"
+        )
+    )
 
 
 if __name__ == "__main__":

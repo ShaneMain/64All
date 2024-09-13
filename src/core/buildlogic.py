@@ -1,12 +1,14 @@
+import asyncio
 import os
-import shutil  # Added import for file copying
 import subprocess
 import sys
 
 import yaml
 
+from core.distrobox import run_ephemeral_command
 
-def run_make(directory, target: str = ""):
+
+def run_make(directory, target: str = "", build_dependencies: list = []):
     original_directory = os.getcwd()
     try:
         os.chdir(directory)
@@ -27,11 +29,9 @@ def run_make(directory, target: str = ""):
         for key, value in user_selections.items():
             cmd.append(f"{key}={value}")
 
-        # Run the make command
-        print(cmd)
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        result.check_returncode()  # Raises CalledProcessError if the command exited non-zero
-        print(result.stdout)
+        command = f'sudo apt update && sudo apt install {" ".join(build_dependencies)} -y && cd {directory} && {" ".join(cmd)}'
+        print(command)
+        asyncio.run(run_ephemeral_command(command))
     except FileNotFoundError as e:
         print(e)
     except subprocess.CalledProcessError as e:
@@ -40,19 +40,25 @@ def run_make(directory, target: str = ""):
         os.chdir(original_directory)
 
 
-def copy_file_to_dir(file_path: str, dir_path: str, file_name: str):
+def symlink_file_to_dir(file_path: str, dir_path: str, link_name: str):
+    """Create a symbolic link to a file in a specified directory."""
     if not os.path.isfile(file_path):
         raise FileNotFoundError(f"{file_path} is not a valid file")
     if not os.path.isdir(dir_path):
         raise NotADirectoryError(f"{dir_path} is not a valid directory")
 
-    dest_path = os.path.join(dir_path, file_name)
+    link_path = os.path.join(dir_path, link_name)
 
     try:
-        shutil.copyfile(file_path, dest_path)
-        print(f"File copied: {dest_path} -> {file_path}")
+        # Remove the existing symlink if it exists
+        if os.path.islink(link_path):
+            os.unlink(link_path)
+
+        # Create a symbolic link
+        os.symlink(file_path, link_path)
+        print(f"Symlink created: {link_path} -> {file_path}")
     except OSError as e:
-        print(f"Error copying file: {e}")
+        print(f"Error creating symlink: {e}")
 
 
 # Example usage
@@ -67,6 +73,6 @@ if __name__ == "__main__":
     source_file = "/path/to/source/file.txt"
     target_dir = "/path/to/target/dir"
     file_name = "copied_file.txt"
-    copy_file_to_dir(source_file, target_dir, file_name)
+    symlink_file_to_dir(source_file, target_dir, file_name)
 
     sys.exit()

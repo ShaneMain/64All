@@ -20,12 +20,13 @@ from PyQt6.QtWidgets import (
     QCheckBox,
 )
 
-from core.buildlogic import copy_file_to_dir, run_make
+from core.buildlogic import symlink_file_to_dir, run_make
 from src.core.romfinder import N64RomValidator
 from src.ui.build_option_utils import (
     add_options_to_layout,
     dump_user_selections,
 )
+from ui.uiutils import add_horizontal_widgets
 
 
 class Mario64All(QMainWindow):
@@ -59,11 +60,6 @@ class Mario64All(QMainWindow):
         self.advanced_checkbox = QCheckBox("Show advanced options")
         self.clone_worker = None
 
-        self.REPOS = []
-        self.repo_options = {}
-        self.user_selections = {}
-        self.worker_thread = QThread()
-
         self.browse_button = QPushButton("Browse...", self)
         self.clone_button = QPushButton("Clone", self)
 
@@ -74,6 +70,13 @@ class Mario64All(QMainWindow):
         )  # Set the spacing between elements in options layout
         self.options_widget.setLayout(self.options_layout)
         self.rom_region, self.rom_dir = N64RomValidator().find_or_select_file()
+
+        self.REPOS = []
+        self.repo_options = {}
+        self.user_selections = {}
+        self.worker_thread = QThread()
+        self.build_dependencies = []
+
         self.setup_ui()
 
     def populate_repo_urls(self):
@@ -87,7 +90,8 @@ class Mario64All(QMainWindow):
         self.output_text.setFixedHeight(200)
 
         # Fork Label and ComboBox
-        self.fork_collection = self.add_horizontal_widgets(
+        self.fork_collection = add_horizontal_widgets(
+            self.main_layout,
             (
                 QLabel("Fork:"),
                 (QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed),
@@ -103,7 +107,8 @@ class Mario64All(QMainWindow):
         )
 
         # Base Directory Label, Entry, and Browse Button
-        self.directory_collection = self.add_horizontal_widgets(
+        self.directory_collection = add_horizontal_widgets(
+            self.main_layout,
             (
                 QLabel("Base Directory:"),
                 (QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed),
@@ -119,7 +124,8 @@ class Mario64All(QMainWindow):
         )
 
         # Branch Label, Branch Menu, and Clone Button
-        self.branch_collection = self.add_horizontal_widgets(
+        self.branch_collection = add_horizontal_widgets(
+            self.main_layout,
             (
                 QLabel("Branch:"),
                 (QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed),
@@ -148,33 +154,14 @@ class Mario64All(QMainWindow):
             self.options_widget, alignment=Qt.AlignmentFlag.AlignTop
         )
 
-    def add_horizontal_widgets(self, *widgets_with_policies):
-        horizontal_layout = QHBoxLayout()
-        horizontal_layout.setContentsMargins(0, 0, 0, 0)  # Remove horizontal margins
-
-        for widget_with_policy in widgets_with_policies:
-            widget, policy = widget_with_policy[:2]
-            alignment = widget_with_policy[2] if len(widget_with_policy) > 2 else None
-
-            # Set the specific size policy provided
-            widget.setSizePolicy(policy[0], policy[1])
-
-            if alignment:
-                horizontal_layout.addWidget(widget, 0, alignment)
-            else:
-                horizontal_layout.addWidget(widget)
-
-        # Add the horizontal layout to the main layout
-        self.main_layout.addLayout(horizontal_layout)
-        return horizontal_layout
-
     def start_building(self):
-        copy_file_to_dir(
+        symlink_file_to_dir(
             self.rom_dir,
             self.workspace,
             f"baserom.{self.rom_region}.z64",
         )
-        run_make(self.workspace)
+        print(self.build_dependencies)
+        run_make(self.workspace, build_dependencies=self.build_dependencies)
 
     def connect_signals(self):
         self.advanced_checkbox.stateChanged.connect(self.update_advanced_options)
@@ -188,14 +175,6 @@ class Mario64All(QMainWindow):
                 widget.setParent(None)
 
         add_options_to_layout(self, repo_options)
-
-    def create_checkbox_handler(self, opt_name):
-        return lambda state: self.user_selections.update(
-            {opt_name: state == Qt.CheckState.Checked}
-        )
-
-    def create_combobox_handler(self, opt_name):
-        return lambda text: self.user_selections.update({opt_name: text})
 
     def update_advanced_options(self):
         self.update_build_options(self.repo_options)

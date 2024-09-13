@@ -51,18 +51,24 @@ def load_repos(obj):
 def on_repo_selection(obj):
     repo_name = obj.repo_url_combobox.currentText()
 
-    obj.repo_url = next(
-        (repo["url"] for repo in obj.REPOS if repo["name"] == repo_name), None
-    )
-
-    default_dir = os.path.abspath(f"./{repo_name}")
-    obj.clone_dir_entry.setText(default_dir)
     repo = next((repo for repo in obj.REPOS if repo["name"] == repo_name), None)
     if repo:
+        obj.repo_url = repo.get("url")
+
+        default_dir = os.path.abspath(f"./{repo_name}")
+        obj.clone_dir_entry.setText(default_dir)
+
+        # Set dependencies
+        obj.build_dependencies = repo.get("dependencies", [])
+        print(obj.build_dependencies)
+
+        # Update branch menu and other options
         update_branch_menu(repo_name, obj.REPOS, obj.branch_menu)
         obj.repo_options = repo.get("options", {})
         obj.update_build_options(obj.repo_options)
-    obj.update_advanced_options()
+
+        # Update advanced options
+        obj.update_advanced_options()
 
 
 def connect_signals(instance: Mario64All):

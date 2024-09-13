@@ -6,8 +6,6 @@ import distro
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QMessageBox, QProgressDialog
 
-app = QApplication(sys.argv)
-
 
 def get_required_packages():
     """Get the required packages and binaries based on the operating system."""
