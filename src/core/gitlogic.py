@@ -16,10 +16,6 @@ class CloneProgress(git.remote.RemoteProgress):
     def update(self, op_code, cur_count, max_count=None, message=""):
         super().update(op_code, cur_count, max_count, message)
 
-        print(
-            f"op_code: {op_code}, cur_count: {cur_count}, max_count: {max_count}, message: {message}"
-        )
-
         # Ensure max_count is a positive number to avoid division by zero or negative values
         if max_count and max_count > 0:
             self.total_progress = int((cur_count / max_count) * 100)
@@ -28,17 +24,16 @@ class CloneProgress(git.remote.RemoteProgress):
         self.total_progress = max(0, min(self.total_progress, 100))
 
         # Emit progress
-        print(f"Total Progress: {self.total_progress} / 100")
         self.progress_signal.emit(self.total_progress)
 
-        # Emit a progress message
+        # Emit a progress message with color
         progress_message = (
-            f"Progress: {cur_count:,} out of {max_count:,} ({(cur_count / max_count) * 100:.2f}%)"
+            f"[32m Progress: {cur_count:,} out of {max_count:,} ({(cur_count / max_count) * 100:.2f}%) [0m"
             if max_count
-            else f"Progress: {cur_count:,}, max count unknown."
+            else f"[32m Progress: {cur_count:,}, max count unknown. [0m"
         )
         if message:
-            progress_message += f" Message: {message}"
+            progress_message += f"[36m Message: {message} [0m"
 
         self.text_signal.emit(progress_message)
 
@@ -58,14 +53,10 @@ class CloneWorker(QObject):
         try:
             os.makedirs(self.clone_dir, exist_ok=True)
             if not self.branch:
-                raise ValueError(
-                    "Branch is not specified. Please select a valid branch."
-                )
+                raise ValueError("Branch is not specified. Please select a valid branch.")
 
             clone_progress = CloneProgress(self.text_signal, self.progress_signal)
-            self.text_signal.emit(
-                f"Cloning repository from {self.repo_url} (branch: {self.branch}) to {self.clone_dir}...\n"
-            )
+            self.text_signal.emit(f"[34mCloning repository from {self.repo_url} (branch: {self.branch}) to {self.clone_dir}...[0m\n")
 
             git.Repo.clone_from(
                 self.repo_url,
@@ -75,48 +66,21 @@ class CloneWorker(QObject):
                 depth=1,  # Perform shallow clone
                 single_branch=True,  # Clone only the specified branch
             )
-            self.text_signal.emit("Repository cloned successfully.\n")
+            self.text_signal.emit("[32mRepository cloned successfully.[0m\n")
+            self.finished_signal.emit(True)  # Indicate success
 
-            # Emit finished signal with success status
-            self.finished_signal.emit(True)
-
-        except FileExistsError as e:
-            self.text_signal.emit(f"Warning: {e}\n")
-            self.terminate_thread(False)
-        except git.exc.GitCommandError as e:
-            self.text_signal.emit(
-                f"An error occurred while executing git command: {e}\n"
-            )
-            self.text_signal.emit(
-                f"Full Command: {e.command}\nOutput:\n{e.stdout}\nError Output:\n{e.stderr}\n"
-            )
-            self.clean_up_directory()
-            self.terminate_thread(False)
-        except ValueError as e:
-            self.text_signal.emit(f"An error occurred: {e}\n")
-            self.clean_up_directory()
-            self.terminate_thread(False)
         except Exception as e:
-            self.text_signal.emit(
-                f"An unexpected error occurred while cloning the repository: {e}\n"
-            )
+            self.text_signal.emit(f"[31mAn error occurred while cloning the repository: {e}[0m\n")
             self.clean_up_directory()
-            self.terminate_thread(False)
-
-    def terminate_thread(self, success):
-        # Emit the finished signal to indicate the task is complete and should terminate the thread
-        self.finished_signal.emit(success)
+            self.finished_signal.emit(False)  # Indicate failure
 
     def clean_up_directory(self):
         try:
             if os.path.exists(self.clone_dir):
                 shutil.rmtree(self.clone_dir)
-                self.text_signal.emit(f"Cleaned up directory '{self.clone_dir}'.\n")
-                self.run()
+                self.text_signal.emit(f"[33mCleaned up directory '{self.clone_dir}'.[0m\n")
         except Exception as e:
-            self.text_signal.emit(
-                f"Error cleaning up directory '{self.clone_dir}': {e}\n"
-            )
+            self.text_signal.emit(f"[31mError cleaning up directory '{self.clone_dir}': {e}[0m\n")
 
 
 def update_branch_menu(repo_name, repos, branch_menu: QComboBox):

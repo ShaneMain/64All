@@ -1,34 +1,61 @@
 import os
-from PyQt6.QtCore import QThread
-from yaml import safe_load
-from src.core.gitlogic import update_branch_menu, CloneWorker
 from typing import Any
 
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
+from yaml import safe_load
+
+from src.core.gitlogic import update_branch_menu, CloneWorker
+
+
+class CloningManager(QObject):
+    progress_signal = pyqtSignal(int)
+    text_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal(bool)
+
+    def __init__(self):
+        super().__init__()
+        self.thread = None
+        self.worker = None
+
+    def start_cloning(self, repo_url: str, clone_dir: str, branch: str):
+        self.thread = QThread()
+        self.worker = CloneWorker(repo_url, clone_dir, branch)
+        self.worker.moveToThread(self.thread)
+
+        self.worker.progress_signal.connect(self.progress_signal.emit)
+        self.worker.text_signal.connect(self.text_signal.emit)
+        self.worker.finished_signal.connect(self.on_finished)
+
+        self.thread.started.connect(self.worker.run)
+        
+        self.thread.start()
+
+    def on_finished(self, success: bool):
+        self.finished_signal.emit(success)
+        self.thread.quit()
+        self.thread.wait()
+        self.thread.deleteLater()
+        self.worker.deleteLater()
+        self.thread = None
+        self.worker = None
+
+    def cleanup(self):
+        if self.thread and self.thread.isRunning():
+            self.thread.quit()
+            self.thread.wait()
+            self.thread.deleteLater()
+        if self.worker:
+            self.worker.deleteLater()
+        self.thread = None
+        self.worker = None
+
 def start_cloning(window: Any):
-    branch = window.ui_setup.branch_menu.currentText()
+    window.ui_setup.update_output_text("Starting cloning process...\n")
     repo_url = window.repo_url
+    branch = window.ui_setup.branch_menu.currentText()
+    clone_dir = os.path.abspath("./.workspace")
 
-    # Create worker and thread locally
-    worker = CloneWorker(repo_url, os.path.abspath("./.workspace"), branch)
-    thread = QThread()
-    worker.moveToThread(thread)
-
-    worker.progress_signal.connect(window.update_progress_bar)
-    worker.text_signal.connect(window.update_output_text)
-    worker.finished_signal.connect(lambda success: window.cloning_finished(success))
-
-    thread.started.connect(worker.run)
-    worker.finished_signal.connect(thread.quit)
-    worker.finished_signal.connect(worker.deleteLater)
-    thread.finished.connect(thread.deleteLater)
-
-    print("Starting cloning process...")
-    thread.start()
-
-    # Reference to keep thread and worker alive
-    window.worker_thread = thread
-    window.worker = worker
-
+    window.start_cloning(repo_url, clone_dir, branch)
 
 def load_repos(repo_manager: Any):
     current_directory = os.path.dirname(os.path.abspath(__file__))
@@ -43,7 +70,7 @@ def load_repos(repo_manager: Any):
             
             # Populate fork menu with all repos
             window = repo_manager.parent
-            window.ui_setup.fork_combobox.clear()
+            window.ui_setup.fork_combobox.clear()   
             for repo in repo_manager.REPOS:
                 window.ui_setup.fork_combobox.addItem(repo["name"])
             window.ui_setup.fork_combobox.setCurrentIndex(0)
@@ -77,6 +104,9 @@ def on_repo_selection(window: Any):
         # Update advanced options
         window.ui_setup.update_advanced_options()
 
+        # Refresh the options layout
+        window.ui_setup.refresh_options_layout()
+
     print(f"Selected repo: {repo_name}, Options: {window.repo_options}")
 
 
@@ -100,6 +130,9 @@ def on_fork_selection(window: Any):
 
         # Update advanced options
         window.ui_setup.update_advanced_options()
+
+        # Refresh the options layout
+        window.ui_setup.refresh_options_layout()
 
     print(f"Selected fork: {fork_name}, Options: {window.repo_options}")
 

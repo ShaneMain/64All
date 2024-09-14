@@ -49,11 +49,11 @@ class DistroboxManager(QObject):
         self,
         box_name: str,
         image: str = "ubuntu:latest",
-        text_box: QTextEdit = None,
+        ui_setup: 'UISetup' = None,  # Change this line
         directory: str = ".",
     ):
         super().__init__()
-        self.text_box = text_box
+        self.ui_setup = ui_setup  # Change this line
         self.created = False
         self.box_name = box_name
         self.image = image
@@ -108,7 +108,7 @@ class DistroboxManager(QObject):
     def _run_command(self, command: str):
         """Run a command asynchronously using the Worker class."""
         self.worker = Worker(command=command, directory=self.directory)
-        if self.text_box:  # Ensure text_box is set before connecting signals
+        if self.ui_setup:  # Ensure ui_setup is set before connecting signals
             self.worker.update_text.connect(self.append_text)
         self.worker.finished_signal.connect(self.worker_finished)
         self.worker.start()
@@ -165,8 +165,8 @@ class DistroboxManager(QObject):
     def append_text(self, text: str):
         """Append text to the QTextEdit box."""
         print(text)
-        if self.text_box:
-            self.text_box.append(text)
+        if self.ui_setup:
+            self.ui_setup.update_output_text(text)
 
     @pyqtSlot()
     def worker_finished(self):
@@ -176,13 +176,13 @@ class DistroboxManager(QObject):
 
 def run_ephemeral_command(
     command: str,
-    textbox: QTextEdit = None,
+    ui_setup: 'UISetup' = None,
     directory=".",
     additional_packages: list = None,
 ):
     async def run():
         manager = DistroboxManager(
-            "ephemeral_runner", text_box=textbox, directory=directory
+            "ephemeral_runner", ui_setup=ui_setup, directory=directory
         )
         await manager.create(True, command, additional_packages=additional_packages)
         # Create an event loop to keep the application running until the worker finishes

@@ -28,7 +28,7 @@ def symlink_file_to_dir(file_path: str, dir_path: str, link_name: str):
 def run_make(
     workspace,
     build_dependencies=None,
-    text_box=None,
+    ui_setup=None,
     user_selections=None,
 ):
     # Prepare base make command
@@ -39,7 +39,7 @@ def run_make(
     runner = run_ephemeral_command(
         command=" ".join(command),
         directory=workspace,
-        textbox=text_box,
+        ui_setup=ui_setup,
         additional_packages=build_dependencies,
     )
     return runner
