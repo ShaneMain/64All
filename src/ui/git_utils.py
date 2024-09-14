@@ -60,7 +60,6 @@ def on_repo_selection(obj):
 
         # Set dependencies
         obj.build_dependencies = repo.get("dependencies", [])
-        print(obj.build_dependencies)
 
         # Update branch menu and other options
         update_branch_menu(repo_name, obj.REPOS, obj.branch_menu)

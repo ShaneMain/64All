@@ -30,6 +30,7 @@ from ui.uiutils import add_horizontal_widgets
 
 
 class Mario64All(QMainWindow):
+    output_text: QTextEdit | QTextEdit
     ui_initialize_started_signal = pyqtSignal()
     ui_initialized_signal = pyqtSignal()
     instance_initialized = pyqtSignal()
@@ -161,7 +162,11 @@ class Mario64All(QMainWindow):
             f"baserom.{self.rom_region}.z64",
         )
         print(self.build_dependencies)
-        run_make(self.workspace, build_dependencies=self.build_dependencies)
+        run_make(
+            self.workspace,
+            build_dependencies=self.build_dependencies,
+            text_box=self.output_text,
+        )
 
     def connect_signals(self):
         self.advanced_checkbox.stateChanged.connect(self.update_advanced_options)

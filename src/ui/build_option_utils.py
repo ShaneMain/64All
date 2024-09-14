@@ -30,7 +30,7 @@ def add_options_to_layout(obj, repo_options):
                     Qt.CheckState.Checked if default_value else Qt.CheckState.Unchecked
                 )
                 checkbox.setToolTip(tooltip_text)
-                checkbox.stateChanged.connect(create_checkbox_handler(opt_name))
+                checkbox.stateChanged.connect(create_checkbox_handler(obj, opt_name))
                 checkboxes.append((opt_name, checkbox))
                 selections[opt_name] = checkbox.isChecked()
             else:
@@ -40,7 +40,9 @@ def add_options_to_layout(obj, repo_options):
                 combobox.addItems([str(value) for value in opt_info["values"]])
                 combobox.setCurrentText(str(default_value))
                 combobox.setToolTip(tooltip_text)
-                combobox.currentTextChanged.connect(create_combobox_handler(opt_name))
+                combobox.currentTextChanged.connect(
+                    create_combobox_handler(obj, opt_name)
+                )
                 dropdowns.append((combobox_label, combobox))
                 selections[opt_name] = combobox.currentText()
 
@@ -110,15 +112,13 @@ def dump_user_selections(obj):
         obj.output_text.append(f"Error saving selections: {error}")
 
 
-def create_checkbox_handler(opt_name):
-    def handler(state):
-        selections[opt_name] = state == Qt.CheckState.Checked
+def create_checkbox_handler(obj, opt_name):
+    return lambda state: obj.user_selections.update(
+        {opt_name: state == Qt.CheckState.Checked}
+    )
 
-    return handler
 
-
-def create_combobox_handler(opt_name):
-    def handler(value):
-        selections[opt_name] = value
+def create_combobox_handler(obj, opt_name):
+    return lambda text: obj.user_selections.update({opt_name: text})
 
     return handler
