@@ -1,4 +1,5 @@
-from src.core.buildlogic import symlink_file_to_dir, run_make
+from core.distrobox import run_ephemeral_command
+from src.core.buildlogic import symlink_file_to_dir
 from src.ui.build_option_utils import add_options_to_layout
 
 
@@ -15,13 +16,17 @@ class BuildManager:
             f"baserom.{self.parent.rom_region}.z64",
         )
         print(self.parent.build_dependencies)
-        self.build_process = run_make(
-            self.parent.workspace,
-            build_dependencies=self.parent.build_dependencies,
+        
+        command = "make -j4 " + " ".join([f"{k}={v}" for k, v in self.user_selections.items()])
+        
+        run_ephemeral_command(
+            command,
             ui_setup=self.parent.ui_setup,
-            user_selections=self.user_selections,
+            directory=self.parent.workspace,
+            additional_packages=self.parent.build_dependencies,
         )
-        self.build_process.finished.connect(self.build_finished)
+        
+        # The build_finished method will be called via the ui_setup's update_output_text method
 
     def build_finished(self, success):
         if success:

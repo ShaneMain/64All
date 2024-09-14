@@ -3,26 +3,29 @@ import os
 import shutil
 import sys
 
-from PyQt6.QtCore import QThread, pyqtSignal, QObject, QEventLoop, pyqtSlot
+from PyQt6.QtCore import QThread, pyqtSignal, QObject, QEventLoop, pyqtSlot, QTimer
 from PyQt6.QtWidgets import QApplication, QTextEdit
 
 from core.dependency_utils import install_packages
+from ui.ui_components import UISetup
 
 
 class Worker(QThread):
     update_text = pyqtSignal(str)
-    finished_signal = pyqtSignal()
+    finished_signal = pyqtSignal(int)  # Change this to emit the return code
 
     def __init__(self, command: str, directory="."):
         super().__init__()
         self.command = command
         self.directory = directory
+        self.process = None
+        self.return_code = None
 
     def run(self):
         asyncio.run(self._async_run())
 
     async def _async_run(self):
-        process = await asyncio.create_subprocess_shell(
+        self.process = await asyncio.create_subprocess_shell(
             self.command,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -37,11 +40,11 @@ class Worker(QThread):
                 self.update_text.emit(line.decode().strip())
 
         await asyncio.gather(
-            stream_output(process.stdout),
-            stream_output(process.stderr),
+            stream_output(self.process.stdout),
+            stream_output(self.process.stderr),
         )
-        await process.wait()
-        self.finished_signal.emit()
+        self.return_code = await self.process.wait()
+        self.finished_signal.emit(self.return_code)
 
 
 class DistroboxManager(QObject):
@@ -49,7 +52,7 @@ class DistroboxManager(QObject):
         self,
         box_name: str,
         image: str = "ubuntu:latest",
-        ui_setup: 'UISetup' = None,  # Change this line
+        ui_setup: "UISetup" = None,  # Change this line
         directory: str = ".",
     ):
         super().__init__()
@@ -134,7 +137,7 @@ class DistroboxManager(QObject):
 
         create_command = f"{base_command} --name {self.box_name}{packages_command} --image {self.image}{run_command}"
 
-        print(create_command)
+        print(f"Executing command: {create_command}")
 
         loop = QEventLoop()
         self.worker = Worker(command=create_command, directory=self.directory)
@@ -143,12 +146,26 @@ class DistroboxManager(QObject):
         self.worker.start()
         loop.exec()  # Wait until the worker finishes
 
-        if not self.worker.isFinished():
+        if self.worker.return_code != 0:
+            error_output = await self.worker.process.stderr.read()
+            error_output = error_output.decode().strip()
             raise RuntimeError(
-                f"Failed to create Distrobox container '{self.box_name}'."
+                f"Failed to create Distrobox container '{self.box_name}'. "
+                f"Exit code: {self.worker.return_code}. Error: {error_output}"
             )
 
         self.created = True
+
+        # If there was an immediate command, we don't need to do anything else
+        if run_immediate_command:
+            return
+
+        # If there was no immediate command, we need to remove the ephemeral container
+        if ephemeral:
+            remove_command = f"distrobox rm {self.box_name} -f"
+            remove_worker = Worker(command=remove_command, directory=self.directory)
+            remove_worker.start()
+            remove_worker.wait()
 
     async def run_command_in_box(self, command: str, ephemeral: bool = False):
         """Run a command inside the Distrobox container asynchronously."""
@@ -176,7 +193,7 @@ class DistroboxManager(QObject):
 
 def run_ephemeral_command(
     command: str,
-    ui_setup: 'UISetup' = None,
+    ui_setup: UISetup = None,
     directory=".",
     additional_packages: list = None,
 ):
@@ -184,14 +201,26 @@ def run_ephemeral_command(
         manager = DistroboxManager(
             "ephemeral_runner", ui_setup=ui_setup, directory=directory
         )
-        await manager.create(True, command, additional_packages=additional_packages)
-        # Create an event loop to keep the application running until the worker finishes
-        loop = QEventLoop()
-        manager.worker.finished_signal.connect(loop.quit)
-        loop.exec()
+        try:
+            await manager.create(True, command, additional_packages=additional_packages)
+            if ui_setup:
+                ui_setup.update_output_text("Command executed successfully in ephemeral container.\n")
+            return True
+        except RuntimeError as e:
+            if ui_setup:
+                ui_setup.update_output_text(f"Error: {str(e)}\n")
+            print(f"Error: {str(e)}")
+            return False
 
-    # Run the async function using asyncio.run()
-    asyncio.run(run())
+    def run_async():
+        success = asyncio.run(run())
+        if ui_setup:
+            if success:
+                ui_setup.update_output_text("Ephemeral command completed successfully.\n")
+            else:
+                ui_setup.update_output_text("Ephemeral command failed. Check the output for errors.\n")
+
+    QTimer.singleShot(0, run_async)
 
 
 if __name__ == "__main__":

@@ -120,7 +120,7 @@ class UISetup:
 
     def setup(self):
         self.parent.output_text = self.output_text
-        self.output_text.setFixedHeight(100)
+        #self.output_text.setFixedHeight(300)
 
         self.setup_fork_section()
         self.setup_directory_section()
@@ -226,15 +226,21 @@ class UISetup:
         # Replace carriage returns with newlines, but only if it's not followed by a newline
         text = re.sub(r"\r(?!\n)", "\n", text)
 
-        # If the new text starts with the same content as the last line,
-        # replace the last line instead of adding a new one
-        if self.last_line and text.startswith(self.last_line):
-            self.text_buffer = self.text_buffer[: -len(self.last_line)] + text
-        else:
-            self.text_buffer += text
+        # Split the text into lines
+        lines = text.split("\n")
 
-        # Update the last line
-        self.last_line = text.split("\n")[-1]
+        for line in lines:
+            # If the new line starts with the same content as the last line,
+            # replace the last line instead of adding a new one
+            if self.last_line and line.startswith(self.last_line):
+                self.text_buffer = (
+                    self.text_buffer[: -len(self.last_line)] + line + "\n"
+                )
+            else:
+                self.text_buffer += line + "\n"
+
+            # Update the last line
+            self.last_line = line
 
         # If the buffer is getting too large, force an update
         if len(self.text_buffer) > 4096:
