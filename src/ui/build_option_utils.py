@@ -1,8 +1,5 @@
-import os
-
-import yaml
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QCheckBox, QLabel, QComboBox, QHBoxLayout, QSpinBox
+from PyQt6.QtWidgets import QCheckBox, QLabel, QComboBox, QSpinBox
 
 selections = {}
 
@@ -83,41 +80,6 @@ def adjust_window_height(window, num_rows):
     additional_height = num_rows * row_height
     new_height = base_height + additional_height
     window.setFixedSize(675, new_height)
-
-
-def dump_user_selections(window):
-    try:
-        # Ensure the clone directory exists
-        clone_directory = window.workspace
-        os.makedirs(clone_directory, exist_ok=True)
-
-        # Filter selections to only include those that are not default
-        non_default_selections = {}
-        for opt_name, opt_info in window.repo_options.items():
-            # Ensure we get sensible default values
-            recommended_value = opt_info.get("recommended")
-            default_value = (
-                opt_info.get("default")
-                if recommended_value is None
-                else recommended_value
-            )
-
-            # Get the current selection
-            current_value = selections.get(opt_name)
-
-            # Compare current value with the defaults (consider bool/int conversions as well)
-            if current_value is not None and str(current_value) != str(default_value):
-                non_default_selections[opt_name] = current_value
-
-        # Write to the YAML file
-        selections_file = os.path.join(clone_directory, ".user_selections.yaml")
-        with open(selections_file, "w") as file:
-            yaml.dump(non_default_selections, file)
-
-        window.ui_setup.output_text.append(f"User selections saved to {selections_file}.")
-    except Exception as error:
-        window.ui_setup.output_text.append(f"Error saving selections: {error}")
-
 
 def create_checkbox_handler(window, opt_name):
     def handler(state):
