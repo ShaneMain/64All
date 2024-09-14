@@ -8,7 +8,8 @@ repos:
         values: [ "us", "eu", "jp", "sh" ]
         description: 'Which ROM to use: the selected ROM has to be in the repo folder with the name baserom.$VERSION.z64. eu and jp are currently only supported on the master branch (sh is not supported at all).'
       TARGET_BITS:
-        default: 64
+        recommended: 64
+        default: 32
         values: [ 32, 64 ]
         description: 'TARGET_BITS=n appends some compiler flags for an n-bit build. If the value is empty, the option does nothing, assuming your native toolchain will set everything up by itself. Use this only if you are having trouble otherwise.'
         advanced: true

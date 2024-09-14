@@ -2,91 +2,98 @@ import os
 
 import yaml
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QCheckBox, QLabel, QComboBox
+from PyQt6.QtWidgets import QCheckBox, QLabel, QComboBox, QHBoxLayout, QSpinBox
 
 selections = {}
 
 
-def add_options_to_layout(obj, repo_options):
-    dropdowns = []
-    checkboxes = []
-    obj.repo_options = repo_options
+def add_options_to_layout(window, repo_options):
+    num_rows = 0
 
     for opt_name, opt_info in repo_options.items():
-        if "values" not in opt_info:
-            continue
+        is_advanced = opt_info.get("advanced", False)
+        should_display = not is_advanced or window.ui_setup.advanced_checkbox.isChecked()
 
-        if not opt_info.get("advanced") or obj.advanced_checkbox.isChecked():
-            tooltip_text = opt_info.get("description", "")
-            default_value = opt_info.get("recommended", opt_info.get("default", ""))
-
-            if (
-                isinstance(opt_info["values"], list)
-                and len(opt_info["values"]) == 2
-                and 0 in opt_info["values"]
-            ):
-                checkbox = QCheckBox(f"{opt_name}:", obj)
-                checkbox.setCheckState(
-                    Qt.CheckState.Checked if default_value else Qt.CheckState.Unchecked
-                )
-                checkbox.setToolTip(tooltip_text)
-                checkbox.stateChanged.connect(create_checkbox_handler(obj, opt_name))
-                checkboxes.append((opt_name, checkbox))
-                selections[opt_name] = checkbox.isChecked()
+        if should_display:
+            label = QLabel(opt_info.get("label", opt_name))
+            label.setProperty("opt_name", opt_name)
+            
+            if isinstance(opt_info.get("values"), list):
+                if len(opt_info["values"]) == 2 and set(opt_info["values"]) == {0, 1}:
+                    # Binary option (0 and 1)
+                    checkbox = QCheckBox()
+                    checkbox.setProperty("opt_name", opt_name)
+                    default_value = opt_info.get("default", opt_info["values"][0])
+                    checkbox.setChecked(default_value == 1)
+                    window.ui_setup.options_layout.addWidget(label, num_rows, 0)
+                    window.ui_setup.options_layout.addWidget(checkbox, num_rows, 1)
+                    setattr(window, f"{opt_name}_checkbox", checkbox)
+                    checkbox.stateChanged.connect(create_checkbox_handler(window, opt_name))
+                else:
+                    # Multiple choice option
+                    combobox = QComboBox()
+                    combobox.setProperty("opt_name", opt_name)
+                    combobox.addItems([str(value) for value in opt_info["values"]])
+                    default_value = opt_info.get("default")
+                    if default_value is not None:
+                        combobox.setCurrentText(str(default_value))
+                    
+                    window.ui_setup.options_layout.addWidget(label, num_rows, 0)
+                    window.ui_setup.options_layout.addWidget(combobox, num_rows, 1)
+                    setattr(window, f"{opt_name}_combobox", combobox)
+                    combobox.currentTextChanged.connect(create_combobox_handler(window, opt_name))
+            elif isinstance(opt_info.get("values"), (int, float)):
+                # Numeric option with a single value (assumed to be the maximum)
+                spinbox = QSpinBox()
+                spinbox.setProperty("opt_name", opt_name)
+                spinbox.setMinimum(0)
+                spinbox.setMaximum(int(opt_info["values"]))
+                default_value = opt_info.get("default", 0)
+                spinbox.setValue(int(default_value))
+                
+                window.ui_setup.options_layout.addWidget(label, num_rows, 0)
+                window.ui_setup.options_layout.addWidget(spinbox, num_rows, 1)
+                setattr(window, f"{opt_name}_spinbox", spinbox)
+                spinbox.valueChanged.connect(create_spinbox_handler(window, opt_name))
             else:
-                combobox_label = QLabel(f"{opt_name}:", obj)
-                combobox_label.setToolTip(tooltip_text)
-                combobox = QComboBox(obj)
-                combobox.addItems([str(value) for value in opt_info["values"]])
-                combobox.setCurrentText(str(default_value))
-                combobox.setToolTip(tooltip_text)
-                combobox.currentTextChanged.connect(
-                    create_combobox_handler(obj, opt_name)
-                )
-                dropdowns.append((combobox_label, combobox))
-                selections[opt_name] = combobox.currentText()
+                # Fallback to combobox for unknown types
+                combobox = QComboBox()
+                combobox.setProperty("opt_name", opt_name)
+                combobox.addItems([str(value) for value in opt_info.get("values", [])])
+                default_value = opt_info.get("default")
+                if default_value is not None:
+                    combobox.setCurrentText(str(default_value))
+                
+                window.ui_setup.options_layout.addWidget(label, num_rows, 0)
+                window.ui_setup.options_layout.addWidget(combobox, num_rows, 1)
+                setattr(window, f"{opt_name}_combobox", combobox)
+                combobox.currentTextChanged.connect(create_combobox_handler(window, opt_name))
 
-    row, col = 0, 0
-    for label, combobox in dropdowns:
-        obj.options_layout.addWidget(label, row, col, 1, 1)
-        obj.options_layout.addWidget(combobox, row, col + 1, 1, 1)
-        col += 2
-        if col >= 6:  # Move to the next row after 3 columns
-            row += 1
-            col = 0
+            num_rows += 1
 
-    for opt_name, checkbox in checkboxes:
-        obj.options_layout.addWidget(
-            checkbox, row, col, 1, 2
-        )  # Full span for checkboxes
-        col += 2
-        if col >= 6:  # Move to the next row after 3 columns
-            row += 1
-            col = 0
-
-    adjust_window_height(obj, row)
+    adjust_window_height(window, num_rows)
 
 
-def adjust_window_height(obj, num_rows):
-    if obj.advanced_checkbox.isChecked():
-        base_height = 415 + obj.branch_menu.height()
+def adjust_window_height(window, num_rows):
+    if window.ui_setup.advanced_checkbox.isChecked():
+        base_height = 415 + window.ui_setup.branch_menu.height()
     else:
         base_height = 400
     row_height = 25
     additional_height = num_rows * row_height
     new_height = base_height + additional_height
-    obj.setFixedSize(675, new_height)
+    window.setFixedSize(675, new_height)
 
 
-def dump_user_selections(obj):
+def dump_user_selections(window):
     try:
         # Ensure the clone directory exists
-        clone_directory = obj.workspace
+        clone_directory = window.workspace
         os.makedirs(clone_directory, exist_ok=True)
 
         # Filter selections to only include those that are not default
         non_default_selections = {}
-        for opt_name, opt_info in obj.repo_options.items():
+        for opt_name, opt_info in window.repo_options.items():
             # Ensure we get sensible default values
             recommended_value = opt_info.get("recommended")
             default_value = (
@@ -107,18 +114,24 @@ def dump_user_selections(obj):
         with open(selections_file, "w") as file:
             yaml.dump(non_default_selections, file)
 
-        obj.output_text.append(f"User selections saved to {selections_file}.")
+        window.ui_setup.output_text.append(f"User selections saved to {selections_file}.")
     except Exception as error:
-        obj.output_text.append(f"Error saving selections: {error}")
+        window.ui_setup.output_text.append(f"Error saving selections: {error}")
 
 
-def create_checkbox_handler(obj, opt_name):
-    return lambda state: obj.user_selections.update(
-        {opt_name: state == Qt.CheckState.Checked}
-    )
+def create_checkbox_handler(window, opt_name):
+    def handler(state):
+        value = 1 if state == Qt.CheckState.Checked else 0
+        window.build_manager.update_user_selection(opt_name, value)
+    return handler
 
 
-def create_combobox_handler(obj, opt_name):
-    return lambda text: obj.user_selections.update({opt_name: text})
+def create_combobox_handler(window, opt_name):
+    def handler(value):
+        window.build_manager.update_user_selection(opt_name, value)
+    return handler
 
+def create_spinbox_handler(window, opt_name):
+    def handler(value):
+        window.build_manager.update_user_selection(opt_name, value)
     return handler

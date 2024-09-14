@@ -13,14 +13,10 @@ class Worker(QThread):
     update_text = pyqtSignal(str)
     finished_signal = pyqtSignal()
 
-    def __init__(
-        self, command: str, box_name: str, ephemeral: bool = False, directory="."
-    ):
+    def __init__(self, command: str, directory="."):
         super().__init__()
         self.command = command
-        self.box_name = box_name
-        self.ephemeral = ephemeral
-        self.dir = directory
+        self.directory = directory
 
     def run(self):
         asyncio.run(self._async_run())
@@ -30,10 +26,10 @@ class Worker(QThread):
             self.command,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=self.dir,
+            cwd=self.directory,
         )
 
-        async def stream_output(stream, _):
+        async def stream_output(stream):
             while True:
                 line = await stream.readline()
                 if not line:
@@ -41,8 +37,8 @@ class Worker(QThread):
                 self.update_text.emit(line.decode().strip())
 
         await asyncio.gather(
-            stream_output(process.stdout, "stdout"),
-            stream_output(process.stderr, "stderr"),
+            stream_output(process.stdout),
+            stream_output(process.stderr),
         )
         await process.wait()
         self.finished_signal.emit()
@@ -63,6 +59,7 @@ class DistroboxManager(QObject):
         self.image = image
         self.bin_folder = os.path.expanduser("~/.local/bin")
         self.directory = directory
+
         self.distrobox_installed = self._check_distrobox_installed()
         self.container_manager_installed = self._check_container_manager_installed()
         self.worker = None  # To keep track of the worker thread
@@ -102,19 +99,15 @@ class DistroboxManager(QObject):
         return shutil.which("podman") is not None
 
     async def _install_container_manager(self):
+        """Install container manager (Podman)."""
         install_packages(["podman"])
         # Verify installation
         if not shutil.which("podman"):
             raise EnvironmentError("Failed to install Podman.")
 
-    def _run_command(self, command: str, ephemeral: bool = False):
+    def _run_command(self, command: str):
         """Run a command asynchronously using the Worker class."""
-        self.worker = Worker(
-            command=command,
-            box_name=self.box_name,
-            ephemeral=ephemeral,
-            directory=self.directory,
-        )
+        self.worker = Worker(command=command, directory=self.directory)
         if self.text_box:  # Ensure text_box is set before connecting signals
             self.worker.update_text.connect(self.append_text)
         self.worker.finished_signal.connect(self.worker_finished)
@@ -144,12 +137,9 @@ class DistroboxManager(QObject):
         print(create_command)
 
         loop = QEventLoop()
-        self.worker = Worker(
-            command=create_command, box_name=self.box_name, directory=self.directory
-        )
+        self.worker = Worker(command=create_command, directory=self.directory)
         self.worker.update_text.connect(self.append_text)
         self.worker.finished_signal.connect(loop.quit)
-
         self.worker.start()
         loop.exec()  # Wait until the worker finishes
 
@@ -166,32 +156,33 @@ class DistroboxManager(QObject):
             await self.create()
 
         command = f"distrobox-enter --name {self.box_name} -- {command}"
-        self._run_command(command, ephemeral)
+        self._run_command(command)
 
         if ephemeral:
             self.created = False
 
     @pyqtSlot(str)
     def append_text(self, text: str):
-        print(text)
         """Append text to the QTextEdit box."""
+        print(text)
         if self.text_box:
             self.text_box.append(text)
 
     @pyqtSlot()
     def worker_finished(self):
+        """Handle worker finish signal."""
         print("Worker thread has finished execution.")
 
 
 def run_ephemeral_command(
     command: str,
-    text_box: QTextEdit = None,
+    textbox: QTextEdit = None,
     directory=".",
     additional_packages: list = None,
 ):
     async def run():
         manager = DistroboxManager(
-            "ephemeral_runner", text_box=text_box, directory=directory
+            "ephemeral_runner", text_box=textbox, directory=directory
         )
         await manager.create(True, command, additional_packages=additional_packages)
         # Create an event loop to keep the application running until the worker finishes

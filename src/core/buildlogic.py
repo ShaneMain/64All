@@ -1,62 +1,7 @@
-import asyncio
 import os
-import subprocess
 import sys
 
-import yaml
-from PyQt6.QtWidgets import QTextEdit
-
 from core.distrobox import run_ephemeral_command
-
-
-def run_make(
-    directory,
-    target: str = "",
-    build_dependencies=None,
-    text_box: QTextEdit = None,
-):
-    if build_dependencies is None:
-        build_dependencies = []
-    original_directory = os.getcwd()
-    try:
-        os.chdir(directory)
-
-        # Read the user selections from the YAML file
-        yaml_file = os.path.join(directory, ".user_selections.yaml")
-        if not os.path.isfile(yaml_file):
-            raise FileNotFoundError(f"{yaml_file} is not found")
-
-        with open(yaml_file, "r") as file:
-            user_selections = yaml.safe_load(file)
-
-        # Construct the make command with the build options
-        cmd = ["make", "-C", f'"{directory}" ' "-j4"]
-        if target:
-            cmd.append(target)
-
-        for key, value in user_selections.items():
-            cmd.append(f"{key}={value}")
-
-        # Command to be written to the script
-        command = " ".join(cmd)
-
-        print(command)
-        # Print the directory and file path
-        print(f"Directory: {directory}")
-
-        # Run the script
-        asyncio.run(
-            run_ephemeral_command(
-                command,
-                additional_packages=build_dependencies,
-            )
-        )
-    except FileNotFoundError as e:
-        print(e)
-    except subprocess.CalledProcessError as e:
-        print(f"Error running make: {e.stderr}")
-    finally:
-        os.chdir(original_directory)
 
 
 def symlink_file_to_dir(file_path: str, dir_path: str, link_name: str):
@@ -80,6 +25,26 @@ def symlink_file_to_dir(file_path: str, dir_path: str, link_name: str):
         print(f"Error creating symlink: {e}")
 
 
+def run_make(
+    workspace,
+    build_dependencies=None,
+    text_box=None,
+    user_selections=None,
+):
+    # Prepare base make command
+    command = ["make", "-j4"]
+    for key, value in user_selections.items():
+        command.append(f"{key}={value}")
+
+    runner = run_ephemeral_command(
+        command=" ".join(command),
+        directory=workspace,
+        textbox=text_box,
+        additional_packages=build_dependencies,
+    )
+    return runner
+
+
 # Example usage
 if __name__ == "__main__":
     # Example directory path where .user_selections.yaml is located
@@ -98,7 +63,3 @@ if __name__ == "__main__":
     symlink_file_to_dir(source_file, target_dir, file_name)
     """
     sys.exit()
-
-
-# distrobox-ephemeral --name ephemeral_runner --additional-packages "build-essential libglew-dev libsdl2-dev" --image debian:stable-slim -- bash -c "cd /home/jc/PycharmProjects/Mario64All/.workspace" && make -j4 DISCORDRPC=False EXT_OPTIONS_MENU=True TEXTURE_FIX=True
-# distrobox create --name tester --image ubuntu:latest --additional-packages "build-essential libglew-dev libsdl2-dev" -- bash -c "cd /home/jc/PycharmProjects/Mario64All/.workspace" && make -j4 DISCORDRPC=False EXT_OPTIONS_MENU=True TEXTURE_FIX=True
