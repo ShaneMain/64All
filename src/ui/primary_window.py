@@ -72,12 +72,6 @@ class Mario64All(QMainWindow):
     def update_advanced_options(self):
         self.ui_setup.update_advanced_options()
 
-    def adjust_window_size(self):
-        if self.ui_setup.advanced_checkbox.isChecked():
-            self.resize(900, 700)  # Adjust this size as needed
-        else:
-            self.resize(900, 600)  # Original size
-
     def closeEvent(self, event):
         self.ui_setup.cleanup()
         super().closeEvent(event)

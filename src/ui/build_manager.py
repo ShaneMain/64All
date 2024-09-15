@@ -16,16 +16,18 @@ class BuildManager:
             f"baserom.{self.parent.rom_region}.z64",
         )
         print(self.parent.build_dependencies)
-        
-        command = "make -j4 " + " ".join([f"{k}={v}" for k, v in self.user_selections.items()])
-        
+
+        command = "make -j4 " + " ".join(
+            [f"{k}={v}" for k, v in self.user_selections.items()]
+        )
+
         run_ephemeral_command(
             command,
             ui_setup=self.parent.ui_setup,
             directory=self.parent.workspace,
             additional_packages=self.parent.build_dependencies,
         )
-        
+
         # The build_finished method will be called via the ui_setup's update_output_text method
 
     def build_finished(self, success):
@@ -67,14 +69,28 @@ class BuildManager:
                     self.update_user_selection(opt_name, default_value)
 
     def update_user_selection(self, opt_name, value):
-        if isinstance(value, str):
-            # Try to convert string values to int or float if possible
-            try:
-                value = int(value)
-            except ValueError:
-                try:
-                    value = float(value)
-                except ValueError:
-                    pass
-        self.user_selections[opt_name] = value
-        print(f"Updated {opt_name} to {value}")
+        if opt_name in [
+            "OSX_BUILD",
+            "TARGET_WEB",
+            "WINDOWS_BUILD",
+            "TARGET_SWITCH",
+            "TARGET_RPI",
+        ]:
+            self.user_selections[opt_name] = 1 if value else 0
+        else:
+            self.user_selections[opt_name] = value
+        print(f"BuildManager: Updated {opt_name} to {value}")
+
+    def get_build_target(self):
+        if self.user_selections.get("OSX_BUILD", 0) == 1:
+            return "OSX"
+        elif self.user_selections.get("TARGET_WEB", 0) == 1:
+            return "Web"
+        elif self.user_selections.get("WINDOWS_BUILD", 0) == 1:
+            return "Windows"
+        elif self.user_selections.get("TARGET_SWITCH", 0) == 1:
+            return "Switch"
+        elif self.user_selections.get("TARGET_RPI", 0) == 1:
+            return "Raspberry Pi"
+        else:
+            return "Linux"

@@ -1,8 +1,8 @@
 import html
 import re
 
-from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal, QSize
-from PyQt6.QtGui import QColor, QPalette, QTextCursor, QFont, QTextOption, QPixmap
+from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal
+from PyQt6.QtGui import QColor, QPalette, QTextCursor, QFont, QTextOption
 from PyQt6.QtWidgets import (
     QLabel,
     QComboBox,
@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QApplication,
     QSplitter,
     QFrame,
+    QSpinBox,
 )
 
 from ui.build_option_utils import add_options_to_layout
@@ -138,11 +139,15 @@ class UISetup:
 
         # Create a frame to contain the image
         self.image_frame = QFrame()
-        self.image_frame.setFixedWidth(left_widget.width() - 20)  # Adjust for layout margins
-        self.image_frame.setFixedHeight(int(self.image_frame.width() * 9 / 16))  # 16:9 aspect ratio
+        self.image_frame.setFixedWidth(
+            left_widget.width() - 20
+        )  # Adjust for layout margins
+        self.image_frame.setFixedHeight(
+            int(self.image_frame.width() * 9 / 16)
+        )  # 16:9 aspect ratio
         image_layout = QVBoxLayout(self.image_frame)
         image_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         self.repo_image.setScaledContents(False)  # Changed to False
         self.repo_image.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center the image
         image_layout.addWidget(self.repo_image)
@@ -170,14 +175,21 @@ class UISetup:
         main_widget.setLayout(main_layout)
         self.parent.setCentralWidget(main_widget)
 
-        # Set the initial size of the main window
-        self.parent.resize(1400, 600)
+        # Call this to set initial state
+        self.advanced_checkbox.stateChanged.connect(self.update_advanced_options)
+        self.update_advanced_options()
 
     def resizeEvent(self, event):
         # Update image frame size when the window is resized
-        left_widget_width = self.parent.width() * 0.21  # Approximately 21% of window width
-        self.image_frame.setFixedWidth(left_widget_width - 20)  # Adjust for layout margins
-        self.image_frame.setFixedHeight(int(self.image_frame.width() * 9 / 16))  # 16:9 aspect ratio
+        left_widget_width = (
+            self.parent.width() * 0.21
+        )  # Approximately 21% of window width
+        self.image_frame.setFixedWidth(
+            left_widget_width - 20
+        )  # Adjust for layout margins
+        self.image_frame.setFixedHeight(
+            int(self.image_frame.width() * 9 / 16)
+        )  # 16:9 aspect ratio
         super().resizeEvent(event)
 
     def setup_existing_content(self, layout):
@@ -239,20 +251,28 @@ class UISetup:
 
     def update_advanced_options(self):
         visible = self.advanced_checkbox.isChecked()
+        current_selections = self.parent.build_manager.user_selections.copy()
 
-        for i in range(self.options_layout.count()):
-            item = self.options_layout.itemAt(i)
-            widget = item.widget()
-            if widget is not None:
-                # Check if this is an advanced option
-                opt_name = widget.property("opt_name")
-                if opt_name:
-                    opt_info = self.parent.repo_options.get(opt_name, {})
-                    is_advanced = opt_info.get("advanced", False)
-                    widget.setVisible(not is_advanced or visible)
+        # Update branch menu visibility
+        self.branch_label.setVisible(visible)
+        self.branch_menu.setVisible(visible)
 
-        # Refresh the layout
+        # Refresh the layout with the new visibility settings
         self.parent.build_manager.update_build_options(self.parent.repo_options)
+
+        # Restore user selections
+        for opt_name, value in current_selections.items():
+            self.parent.build_manager.update_user_selection(opt_name, value)
+
+        # Update UI to reflect restored selections
+        self.refresh_options_layout()
+
+        # Ensure BUILD_TARGET dropdown is always visible
+        build_target_widget = self.options_layout.findChild(
+            QWidget, "BUILD_TARGET_widget"
+        )
+        if build_target_widget:
+            build_target_widget.setVisible(True)
 
     def update_output_text(self, text):
         # Replace carriage returns with newlines, but only if it's not followed by a newline
@@ -319,6 +339,17 @@ class UISetup:
 
         # Rebuild the layout
         self.parent.build_manager.update_build_options(self.parent.repo_options)
+
+        # Update UI to reflect current selections
+        for opt_name, value in self.parent.build_manager.user_selections.items():
+            widget = self.options_layout.findChild(QWidget, f"{opt_name}_widget")
+            if widget:
+                if isinstance(widget, QCheckBox):
+                    widget.setChecked(bool(value))
+                elif isinstance(widget, QComboBox):
+                    widget.setCurrentText(str(value))
+                elif isinstance(widget, QSpinBox):
+                    widget.setValue(int(value))
 
     def cloning_finished(self, success):
         if success:
