@@ -2,11 +2,11 @@ repos:
   - name: Render96ex
     url: "https://github.com/Render96/Render96ex.git"
     dependencies: [ "build-essential", "libglew-dev", "libsdl2-dev" ]
+    info:
+      description: "Render96 is a free-to-play fan modification for Super Mario 64. The goal of this project is to match the promotional artwork used for the game during the late 1990's. Every model and asset was 100% recreated using images found online from the Nintendo 64 era. The Render96 team does not condone the use of piracy or any other illegal action that may directly harm Nintendo or its intellectual properties."
+      trailer: https://youtu.be/uJiKlXhPbRI?t=14
+      image: "render96.jpg"
     options:
-      VERSION:
-        default: "us"
-        values: [ "us", "eu", "jp", "sh" ]
-        description: 'Which ROM to use: the selected ROM has to be in the repo folder with the name baserom.$VERSION.z64. eu and jp are currently only supported on the master branch (sh is not supported at all).'
       TARGET_BITS:
         recommended: 64
         default: 32
@@ -74,15 +74,11 @@ repos:
   - name: sm64ex
     url: "https://github.com/sm64pc/sm64ex.git"
     options:
-      VERSION:
-        default: "us"
-        values: [ "us", "eu", "jp", "sh" ]
-        description: 'Which ROM to use: the selected ROM has to be in the repo folder with the name baserom.$VERSION.z64. eu and jp are currently only supported on the master branch (sh is not supported at all).'
       TARGET_BITS:
-        default: 64
-        values: [ 32, 64 ]
-        description: 'TARGET_BITS=n appends some compiler flags for an n-bit build. If the value is empty, the option does nothing, assuming your native toolchain will set everything up by itself. Use this only if you are having trouble otherwise.'
-        advanced: true
+      default: 64
+      values: [ 32, 64 ]
+      description: 'TARGET_BITS=n appends some compiler flags for an n-bit build. If the value is empty, the option does nothing, assuming your native toolchain will set everything up by itself. Use this only if you are having trouble otherwise.'
+      advanced: true
       TARGET_RPI:
         default: 0
         values: [ 0, 1 ]
