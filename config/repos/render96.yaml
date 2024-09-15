@@ -1,0 +1,56 @@
+- name: Render96ex
+  url: "https://github.com/Render96/Render96ex.git"
+  dependencies: [ "build-essential", "libglew-dev", "libsdl2-dev" ]
+  info:
+    description: "Render96 is a free-to-play fan modification for Super Mario 64. The goal of this project is to match the promotional artwork used for the game during the late 1990's. Every model and asset was 100% recreated using images found online from the Nintendo 64 era. The Render96 team does not condone the use of piracy or any other illegal action that may directly harm Nintendo or its intellectual properties."
+    trailer: https://youtu.be/uJiKlXhPbRI?t=14
+    image: "render96.jpg"
+    special_options:
+      install_models:
+        default: 1
+        values: [ 0, 1 ]
+        description: 'Install Render96 models.'
+      install_textures:
+        default: 1
+        values: [ 0, 1 ]
+        description: 'Install Render96 textures.'
+  options:
+    TARGET_BITS:
+      recommended: 64
+      default: 32
+      values: [ 32, 64 ]
+      description: 'TARGET_BITS=n appends some compiler flags for an n-bit build. If the value is empty, the option does nothing, assuming your native toolchain will set everything up by itself. Use this only if you are having trouble otherwise.'
+      advanced: true
+    WINDOWS_CONSOLE:
+      default: 0
+      values: [ 0, 1 ]
+      description: 'Append -mconsole to Windows CFLAGS, making a console window appear while the game is running. Can be useful for debugging purposes.'
+      advanced: true
+    DEBUG:
+      default: 0
+      values: [ 0, 1 ]
+      description: 'Build with debug symbols and default optimization level. Otherwise build with -O2.'
+      advanced: true
+    RENDER_API:
+      default: "GL"
+      values: [ "GL", "GL_LEGACY", "D3D11", "D3D12" ]
+      description: 'Select rendering backend to use. GL corresponds to OpenGL 2.1 (gfx_opengl.c), GL_LEGACY corresponds to OpenGL 1.3 (gfx_opengl_legacy.c). Direct3D backends will also force WINDOW_API to DXGI.'
+      advanced: true
+    AUDIO_API:
+      default: "SDL2"
+      values: [ "SDL1", "SDL2" ]
+      description: 'Select audio backend. Keep in mind that you CANNOT mix SDL1 and SDL2.'
+      advanced: true
+    TEXTURE_FIX:
+      recommended: 1
+      default: 0
+      values: [ 0, 1 ]
+      description: 'Enable various texture-related bugfixes (e.g. fixes the smoke texture).'
+    EXT_OPTIONS_MENU:
+      default: 1
+      values: [ 0, 1 ]
+      description: 'Enable Options menu. Accessed from the Pause menu by pressing R.'
+    DISCORDRPC:
+      default: 0
+      values: [ 0, 1 ]
+      description: 'Enable Discord Rich Presence support. Only works on x86_64.'

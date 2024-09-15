@@ -19,6 +19,7 @@ class CloningManager(QObject):
         self.worker = None
 
     def start_cloning(self, repo_url: str, clone_dir: str, branch: str):
+        self.text_signal.emit(f"Setting up cloning process for {repo_url}\n")
         self.thread = QThread()
         self.worker = CloneWorker(repo_url, clone_dir, branch)
         self.worker.moveToThread(self.thread)
@@ -29,9 +30,11 @@ class CloningManager(QObject):
 
         self.thread.started.connect(self.worker.run)
 
+        self.text_signal.emit("Starting cloning thread...\n")
         self.thread.start()
 
     def on_finished(self, success: bool):
+        self.text_signal.emit("Cloning process finished.\n")
         self.finished_signal.emit(success)
         self.thread.quit()
         self.thread.wait()
@@ -53,69 +56,67 @@ class CloningManager(QObject):
 
 def start_cloning(window: Any):
     window.ui_setup.update_output_text("Starting cloning process...\n")
-    repo_url = window.repo_url
-    branch = window.ui_setup.branch_menu.currentText()
-    clone_dir = os.path.abspath("./.workspace")
-
-    window.start_cloning(repo_url, clone_dir, branch)
+    repo_name = window.ui_setup.repo_url_combobox.currentText()
+    repo = next((r for r in window.repo_manager.REPOS if r["name"] == repo_name), None)
+    if repo:
+        repo_url = repo.get("url")
+        branch = window.ui_setup.branch_menu.currentText()
+        clone_dir = os.path.abspath("./.workspace")
+        window.start_cloning(repo_url, clone_dir, branch)
+    else:
+        window.ui_setup.update_output_text("Error: Selected repository not found.\n")
 
 
 def load_repos(repo_manager: Any):
     current_directory = os.path.dirname(os.path.abspath(__file__))
-    yaml_file = os.path.join(current_directory, "../..", "config", "repos.yaml")
-    yaml_file = os.path.abspath(yaml_file)
+    repos_dir = os.path.join(current_directory, "../..", "config", "repos")
+    repos_dir = os.path.abspath(repos_dir)
+    
+    repo_manager.REPOS = []
+    
     try:
-        with open(yaml_file, "r") as file:
-            data = safe_load(file)
-            repo_manager.REPOS = data.get("repos", [])
-            repo_manager.populate_repo_urls()
-            print(repo_manager.REPOS)
+        for filename in os.listdir(repos_dir):
+            if filename.endswith('.yaml'):
+                file_path = os.path.join(repos_dir, filename)
+                with open(file_path, 'r') as file:
+                    data = safe_load(file)
+                    if isinstance(data, list):
+                        repo_manager.REPOS.extend(data)
+                    elif isinstance(data, dict):
+                        repo_manager.REPOS.append(data)
+        
+        repo_manager.populate_repo_urls()
+        print(f"Total repos loaded: {len(repo_manager.REPOS)}")
 
-            # Populate fork menu with all repos
-            window = repo_manager.parent
-            window.ui_setup.branch_combobox.clear()
-            for repo in repo_manager.REPOS:
-                window.ui_setup.branch_combobox.addItem(repo["name"])
-            window.ui_setup.branch_combobox.setCurrentIndex(0)
+        # Populate fork menu with all repos
+        window = repo_manager.parent
+        window.ui_setup.branch_combobox.clear()
+        for repo in repo_manager.REPOS:
+            window.ui_setup.branch_combobox.addItem(repo["name"])
+        window.ui_setup.branch_combobox.setCurrentIndex(0)
 
-            on_repo_selection(repo_manager.parent)
-            on_fork_selection(repo_manager.parent)
     except Exception as error:
-        print(f"Error loading YAML file: {error}")
+        print(f"Error loading repo configurations: {error}")
 
 
-def on_repo_selection(window: Any):
-    repo_name = window.ui_setup.repo_url_combobox.currentText()
+def populate_repo_urls(self):
+    self.parent.ui_setup.repo_url_combobox.clear()
+    self.parent.ui_setup.branch_combobox.clear()
+    for repo in self.REPOS:
+        self.parent.ui_setup.repo_url_combobox.addItem(repo["name"])
+        self.parent.ui_setup.branch_combobox.addItem(repo["name"])
 
-    repo = next(
-        (repo for repo in window.repo_manager.REPOS if repo["name"] == repo_name), None
-    )
-    if repo:
-        window.repo_url = repo.get("url")
+    # Set the current index to 0 for both comboboxes
+    self.parent.ui_setup.repo_url_combobox.setCurrentIndex(0)
+    self.parent.ui_setup.branch_combobox.setCurrentIndex(0)
 
-        default_dir = os.path.abspath(f"./{repo_name}")
-        window.ui_setup.clone_dir_entry.setText(default_dir)
+    # Trigger the repo selection handler
+    self.parent.ui_setup.on_repo_selection()
 
-        # Set dependencies
-        window.build_dependencies = repo.get("dependencies", [])
-
-        # Update branch menu and other options
-        update_branch_menu(
-            repo_name, window.repo_manager.REPOS, window.ui_setup.branch_menu
-        )
-        window.repo_options = repo.get("options", {})
-        window.build_manager.update_build_options(window.repo_options)
-
-        # Update fork options
-        window.ui_setup.branch_combobox.setCurrentText(repo_name)
-
-        # Update advanced options
-        window.ui_setup.update_advanced_options()
-
-        # Refresh the options layout
-        window.ui_setup.refresh_options_layout()
-
-    print(f"Selected repo: {repo_name}, Options: {window.repo_options}")
+def connect_signals(self):
+    self.advanced_checkbox.stateChanged.connect(self.update_advanced_options)
+    self.browse_button.clicked.connect(self.parent.repo_manager.browse_directory)
+    self.repo_url_combobox.currentIndexChanged.connect(self.on_repo_selection)
 
 
 def on_fork_selection(window: Any):

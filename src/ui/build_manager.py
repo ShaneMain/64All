@@ -1,3 +1,7 @@
+import os
+
+import yaml
+
 from core.distrobox import run_ephemeral_command
 from src.core.buildlogic import symlink_file_to_dir
 from src.ui.build_option_utils import add_options_to_layout
@@ -40,7 +44,33 @@ class BuildManager:
                 "[31m Build failed. Check the output for errors. [0m"
             )
 
-    def update_build_options(self, repo_options):
+    def load_repo_configs(self):
+        repo_configs = {}
+        config_dir = "config/repos/"
+
+        for filename in os.listdir(config_dir):
+            if filename.endswith(".yaml"):
+                with open(os.path.join(config_dir, filename), "r") as file:
+                    config = yaml.safe_load(file)
+                    for repo in config:
+                        repo_configs[repo["name"]] = repo
+
+        return repo_configs
+
+    def update_build_options(self, repo_options=None):
+        current_repo = self.parent.ui_setup.repo_url_combobox.currentText()
+        
+        if not current_repo:
+            print("No repository selected. Please select a repository first.")
+            return
+        
+        if repo_options is None:
+            repo_options = self.parent.repo_options.get(current_repo, {})
+
+        if not repo_options:
+            print(f"No options found for repository: {current_repo}")
+            return
+
         # Store current selections
         current_selections = self.user_selections.copy()
 
@@ -52,6 +82,7 @@ class BuildManager:
                 widget.setParent(None)
 
         # Rebuild the layout
+        from ui.build_option_utils import add_options_to_layout
         add_options_to_layout(self.parent, repo_options)
 
         # Restore selections, using recommended or default values for new options
@@ -68,18 +99,10 @@ class BuildManager:
                 elif default_value is not None:
                     self.update_user_selection(opt_name, default_value)
 
-    def update_user_selection(self, opt_name, value):
-        if opt_name in [
-            "OSX_BUILD",
-            "TARGET_WEB",
-            "WINDOWS_BUILD",
-            "TARGET_SWITCH",
-            "TARGET_RPI",
-        ]:
-            self.user_selections[opt_name] = 1 if value else 0
-        else:
-            self.user_selections[opt_name] = value
-        print(f"BuildManager: Updated {opt_name} to {value}")
+    def update_user_selection(self, option_name, value):
+        self.user_selections[option_name] = value
+        # Update the UI to reflect the new selection
+        # This part depends on how your UI is structured
 
     def get_build_target(self):
         if self.user_selections.get("OSX_BUILD", 0) == 1:

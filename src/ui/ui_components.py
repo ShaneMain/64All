@@ -1,8 +1,9 @@
 import html
+import os
 import re
 
 from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal
-from PyQt6.QtGui import QColor, QPalette, QTextCursor, QFont, QTextOption
+from PyQt6.QtGui import QColor, QPalette, QTextCursor, QFont, QTextOption, QPixmap
 from PyQt6.QtWidgets import (
     QLabel,
     QComboBox,
@@ -32,7 +33,9 @@ class GitProgress(QObject):
 class UISetup:
     def __init__(self, parent):
         self.parent = parent
-        self.repo_url_combobox = QComboBox()
+        self.current_repo = None
+        self.repo_url_combobox = QComboBox(parent)
+        self.repo_url_combobox.currentIndexChanged.connect(self.on_repo_selection)
         self.repo_url_label = QLabel("Repository:")
         self.clone_dir_entry = QLineEdit(parent)
         self.branch_menu = QComboBox(parent)
@@ -119,6 +122,10 @@ class UISetup:
         self.repo_trailer = QLabel(parent)
         self.repo_description = QTextEdit(parent)
         self.repo_description.setReadOnly(True)
+
+        self.repo_url_combobox.currentIndexChanged.connect(self.on_repo_selection)
+
+        self.current_repo = None
 
     def update_color_map(self):
         app = QApplication.instance()
@@ -230,6 +237,72 @@ class UISetup:
     def connect_signals(self):
         self.advanced_checkbox.stateChanged.connect(self.update_advanced_options)
         self.browse_button.clicked.connect(self.parent.repo_manager.browse_directory)
+
+    def on_repo_selection(self):
+        repo_name = self.repo_url_combobox.currentText()
+        if not repo_name or repo_name == self.current_repo:
+            return
+
+        self.current_repo = repo_name
+        repo = next(
+            (
+                repo
+                for repo in self.parent.repo_manager.REPOS
+                if repo["name"] == repo_name
+            ),
+            None,
+        )
+        if repo:
+            self.parent.repo_url = repo.get("url")
+            default_dir = os.path.abspath(f"./{repo_name}")
+            self.clone_dir_entry.setText(default_dir)
+
+            self.parent.build_dependencies = repo.get("dependencies", [])
+
+            from core.gitlogic import update_branch_menu
+
+            update_branch_menu(
+                repo_name, self.parent.repo_manager.REPOS, self.branch_menu
+            )
+
+            self.parent.repo_options = repo.get("options", {})
+            self.parent.build_manager.update_build_options(self.parent.repo_options)
+
+            self.branch_combobox.setCurrentText(repo_name)
+
+            self.update_advanced_options()
+
+            # Update image
+            info = repo.get("info", {})
+            image_path = os.path.join("config", "images", info.get("image", ""))
+            if os.path.exists(image_path):
+                pixmap = QPixmap(image_path)
+                self.repo_image.setPixmap(
+                    pixmap.scaled(
+                        300,
+                        200,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+            else:
+                self.repo_image.clear()
+
+            # Update description
+            description = info.get("description", "No description available.")
+            self.repo_description.setPlainText(description)
+
+            # Update trailer
+            trailer_link = info.get("trailer", "")
+            if trailer_link:
+                self.repo_trailer.setText(f'<a href="{trailer_link}">Watch Trailer</a>')
+                self.repo_trailer.setOpenExternalLinks(True)
+            else:
+                self.repo_trailer.clear()
+
+            print(f"Selected repo: {repo_name}, Options: {self.parent.repo_options}")
+        else:
+            print(f"Repository {repo_name} not found in loaded repos.")
 
     def update_build_options(self, repo_options):
         for i in reversed(range(self.parent.ui_setup.options_layout.count())):
