@@ -1,12 +1,11 @@
 import os
 
-from PyQt6.QtCore import QThread, QTimer
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QMainWindow
 
-from src.core.distrobox import DistroboxManager
 from src.core.romfinder import N64RomValidator
 from .build_manager import BuildManager
-from .git_utils import load_repos, CloningManager
+from .git_utils import CloningManager
 from .repo_manager import RepoManager
 from .ui_components import UISetup
 
@@ -14,37 +13,23 @@ from .ui_components import UISetup
 class Mario64All(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Mario Sixty For All")
-        # self.setFixedSize(1400, 600)
-
-        self.main_widget = QWidget()
-        self.main_layout = QVBoxLayout(self.main_widget)
-        self.main_layout.setSpacing(5)
-        self.main_layout.setContentsMargins(10, 10, 10, 10)
-        self.setCentralWidget(self.main_widget)
-
-        self.workspace = os.path.abspath("./.workspace")
-        self.rom_region, self.rom_dir = N64RomValidator().find_or_select_file()
-        self.worker_thread = QThread()
-        self.build_dependencies = []
-        self.repo_url = ""
-        self.repo_options = {}
-        self.cloning_manager = CloningManager()
-        self.cloning_manager.progress_signal.connect(self.update_progress_bar)
-        self.cloning_manager.text_signal.connect(self.update_output_text)
-        self.cloning_manager.finished_signal.connect(self.cloning_finished)
-        self.ui_setup = UISetup(self)
         self.repo_manager = RepoManager(self)
-        self.build_manager = BuildManager(self)
-        self.distrobox_manager = DistroboxManager(
-            "ephemeral_runner", ui_setup=self.ui_setup
-        )
-
+        self.ui_setup = None  # Initialize as None
+        self.build_manager = None  # Initialize as None
+        self.cloning_manager = CloningManager()
+        self.repo_url = ""
+        self.rom_region, self.rom_dir = N64RomValidator().find_or_select_file()
+        self.build_dependencies = []
+        self.workspace = os.path.abspath("./.workspace")
+        self.repo_options = {}
         self.setup_ui()
-        load_repos(self.repo_manager)
 
     def setup_ui(self):
+        self.ui_setup = UISetup(self)  # Create UISetup instance
+        self.build_manager = BuildManager(self)  # Create BuildManager instance
         self.ui_setup.setup()
+        self.repo_manager.load_repos()
+        self.repo_manager.populate_repo_urls()  # Call this after ui_setup is created
 
     def update_progress_bar(self, value):
         self.ui_setup.update_progress_bar(value)
@@ -53,6 +38,12 @@ class Mario64All(QMainWindow):
         self.ui_setup.update_output_text(text)
 
     def start_cloning(self, repo_url, clone_dir, branch):
+        self.ui_setup.update_output_text(
+            f"Initiating cloning: {repo_url} to {clone_dir} (branch: {branch})\n"
+        )
+        self.cloning_manager.progress_signal.connect(self.update_progress_bar)
+        self.cloning_manager.text_signal.connect(self.update_output_text)
+        self.cloning_manager.finished_signal.connect(self.cloning_finished)
         self.cloning_manager.start_cloning(repo_url, clone_dir, branch)
 
     def cloning_finished(self, success):

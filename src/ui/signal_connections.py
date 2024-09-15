@@ -1,4 +1,4 @@
-from src.ui.git_utils import start_cloning, on_repo_selection, on_fork_selection
+from src.ui.git_utils import start_cloning
 
 
 def connect_signals(window):
@@ -8,10 +8,14 @@ def connect_signals(window):
     # Repo Manager signals
     window.ui_setup.clone_button.clicked.connect(lambda: start_cloning(window))
     window.ui_setup.repo_url_combobox.currentIndexChanged.connect(
-        lambda _: on_repo_selection(window)
+        lambda _: window.ui_setup.repo_url_combobox.currentIndexChanged.connect(
+            window.ui_setup.on_repo_selection
+        )
     )
     window.ui_setup.branch_combobox.currentIndexChanged.connect(
-        lambda _: on_fork_selection(window)
+        lambda _: window.ui_setup.repo_url_combobox.currentIndexChanged.connect(
+            window.ui_setup.on_repo_selection
+        )
     )
 
     # Build Manager signals

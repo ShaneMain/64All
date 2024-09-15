@@ -41,7 +41,7 @@ class CloneProgress(git.remote.RemoteProgress):
 class CloneWorker(QObject):
     progress_signal = pyqtSignal(int)
     text_signal = pyqtSignal(str)
-    finished_signal = pyqtSignal(bool)  # Emit a bool indicating success or failure
+    finished_signal = pyqtSignal(bool)
 
     def __init__(self, repo_url, clone_dir, branch):
         super().__init__()
@@ -51,36 +51,35 @@ class CloneWorker(QObject):
 
     def run(self):
         try:
-            os.makedirs(self.clone_dir, exist_ok=True)
-            if not self.branch:
-                raise ValueError("Branch is not specified. Please select a valid branch.")
-
-            clone_progress = CloneProgress(self.text_signal, self.progress_signal)
-            self.text_signal.emit(f"[34mCloning repository from {self.repo_url} (branch: {self.branch}) to {self.clone_dir}...[0m\n")
-
-            git.Repo.clone_from(
+            self.text_signal.emit(f"Cloning {self.repo_url} into {self.clone_dir}\n")
+            
+            # Check if the directory already exists
+            if os.path.exists(self.clone_dir):
+                self.text_signal.emit(f"Directory {self.clone_dir} already exists. Removing it...\n")
+                shutil.rmtree(self.clone_dir)
+            
+            progress = CloneProgress(self.text_signal, self.progress_signal)
+            
+            # Use single-branch cloning
+            repo = git.Repo.clone_from(
                 self.repo_url,
                 self.clone_dir,
-                progress=clone_progress,
                 branch=self.branch,
-                depth=1,  # Perform shallow clone
-                single_branch=True,  # Clone only the specified branch
+                progress=progress,
+                single_branch=True,
+                depth=1
             )
-            self.text_signal.emit("[32mRepository cloned successfully.[0m\n")
-            self.finished_signal.emit(True)  # Indicate success
-
+            
+            self.text_signal.emit("Cloning completed successfully.\n")
+            self.finished_signal.emit(True)
+        except git.exc.GitCommandError as e:
+            self.text_signal.emit(f"Error during cloning: {str(e)}\n")
+            self.text_signal.emit(f"Git command output: {e.stdout}\n")
+            self.text_signal.emit(f"Git command error output: {e.stderr}\n")
+            self.finished_signal.emit(False)
         except Exception as e:
-            self.text_signal.emit(f"[31mAn error occurred while cloning the repository: {e}[0m\n")
-            self.clean_up_directory()
-            self.finished_signal.emit(False)  # Indicate failure
-
-    def clean_up_directory(self):
-        try:
-            if os.path.exists(self.clone_dir):
-                shutil.rmtree(self.clone_dir)
-                self.text_signal.emit(f"[33mCleaned up directory '{self.clone_dir}'.[0m\n")
-        except Exception as e:
-            self.text_signal.emit(f"[31mError cleaning up directory '{self.clone_dir}': {e}[0m\n")
+            self.text_signal.emit(f"Unexpected error during cloning: {str(e)}\n")
+            self.finished_signal.emit(False)
 
 
 def update_branch_menu(repo_name, repos, branch_menu: QComboBox):
@@ -93,6 +92,7 @@ def update_branch_menu(repo_name, repos, branch_menu: QComboBox):
             print("No repository URL found for the selected repository.\n")
             return
 
+        # Fetch only the branch names without cloning
         result = git.cmd.Git().ls_remote("--heads", repo_url)
 
         branch_lines = result.strip().split("\n")

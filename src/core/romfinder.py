@@ -119,7 +119,21 @@ class N64RomValidator:
         return valid_files
 
     def find_or_select_file(self):
-        """Find known ROM files or prompt user to select a file, validating the selected file."""
+        """
+        Determine or choose an N64 ROM file for further processing.
+
+        If valid files are found in the system:
+        1. If there is exactly one valid file, it is automatically selected.
+        2. If there are multiple valid files, the user is prompted to select one.
+
+        If no valid files are initially found, the user is asked to manually provide a file path.
+        - The manually chosen file's validity is determined using its hash value.
+        - If the hash corresponds to a known ROM, it is selected.
+        - If not, the user is prompted again until a valid file is found or the operation is canceled.
+
+        Returns:
+            tuple: Contains the file region and the file path of the selected valid N64 ROM, or (None, None) if no valid file is ultimately selected.
+        """
         valid_files = self.check_rom_files()
         final_file_region = None
         final_file_path = None

@@ -1,4 +1,4 @@
-#!/bin/bash
+    #!/bin/bash
 
 set -e
 
@@ -55,7 +55,7 @@ if [ ! -f "$LIB_PYTHON_PATH" ]; then
 fi
 
 LIB_TYPE=$(file "$LIB_PYTHON_PATH")
-if ! echo "$LIB_TYPE" | grep -q "64-bit"; then
+if ! echo "$LIB_TYPE" | grep -q "64-bit"; then  
     echo "Error: The library at $LIB_PYTHON_PATH is not a 64-bit version."
     exit 1
 fi
@@ -80,13 +80,11 @@ import PyQt6
 import os
 import modulegraph.modulegraph
 
-
 # Helper function to find all imports
 def find_all_imports(entry_point):
     mg = modulegraph.modulegraph.ModuleGraph()
     mg.run_script(entry_point)
     return mg
-
 
 # Entry point of the application
 entry_point = "src/main.py"
@@ -110,8 +108,9 @@ datas = []
 my_package_datas = collect_data_files("src")
 datas.extend(my_package_datas)
 
-# Include your YAML file using a relative path
-datas.append(("./config/repos.yaml", "config"))
+# Collect all YAML files from the config/repos directory
+yaml_files = [(os.path.join("config", "repos", f), "config/repos") for f in os.listdir("config/repos") if f.endswith(".yaml")]
+datas.extend(yaml_files)
 
 # Predefined paths for PyQt6 plugins
 qt_plugins_path = os.path.join(os.path.dirname(PyQt6.__file__), "Qt6", "plugins")
