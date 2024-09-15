@@ -1,7 +1,8 @@
 import os
 from typing import Any
 
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, QThread, pyqtSignal, Qt
+from PyQt6.QtGui import QPixmap
 from yaml import safe_load
 
 from src.core.gitlogic import update_branch_menu, CloneWorker
@@ -27,7 +28,7 @@ class CloningManager(QObject):
         self.worker.finished_signal.connect(self.on_finished)
 
         self.thread.started.connect(self.worker.run)
-        
+
         self.thread.start()
 
     def on_finished(self, success: bool):
@@ -49,6 +50,7 @@ class CloningManager(QObject):
         self.thread = None
         self.worker = None
 
+
 def start_cloning(window: Any):
     window.ui_setup.update_output_text("Starting cloning process...\n")
     repo_url = window.repo_url
@@ -56,6 +58,7 @@ def start_cloning(window: Any):
     clone_dir = os.path.abspath("./.workspace")
 
     window.start_cloning(repo_url, clone_dir, branch)
+
 
 def load_repos(repo_manager: Any):
     current_directory = os.path.dirname(os.path.abspath(__file__))
@@ -67,15 +70,16 @@ def load_repos(repo_manager: Any):
             repo_manager.REPOS = data.get("repos", [])
             repo_manager.populate_repo_urls()
             print(repo_manager.REPOS)
-            
+
             # Populate fork menu with all repos
             window = repo_manager.parent
-            window.ui_setup.fork_combobox.clear()   
+            window.ui_setup.branch_combobox.clear()
             for repo in repo_manager.REPOS:
-                window.ui_setup.fork_combobox.addItem(repo["name"])
-            window.ui_setup.fork_combobox.setCurrentIndex(0)
-            
+                window.ui_setup.branch_combobox.addItem(repo["name"])
+            window.ui_setup.branch_combobox.setCurrentIndex(0)
+
             on_repo_selection(repo_manager.parent)
+            on_fork_selection(repo_manager.parent)
     except Exception as error:
         print(f"Error loading YAML file: {error}")
 
@@ -83,7 +87,9 @@ def load_repos(repo_manager: Any):
 def on_repo_selection(window: Any):
     repo_name = window.ui_setup.repo_url_combobox.currentText()
 
-    repo = next((repo for repo in window.repo_manager.REPOS if repo["name"] == repo_name), None)
+    repo = next(
+        (repo for repo in window.repo_manager.REPOS if repo["name"] == repo_name), None
+    )
     if repo:
         window.repo_url = repo.get("url")
 
@@ -94,12 +100,14 @@ def on_repo_selection(window: Any):
         window.build_dependencies = repo.get("dependencies", [])
 
         # Update branch menu and other options
-        update_branch_menu(repo_name, window.repo_manager.REPOS, window.ui_setup.branch_menu)
+        update_branch_menu(
+            repo_name, window.repo_manager.REPOS, window.ui_setup.branch_menu
+        )
         window.repo_options = repo.get("options", {})
         window.build_manager.update_build_options(window.repo_options)
 
         # Update fork options
-        window.ui_setup.fork_combobox.setCurrentText(repo_name)
+        window.ui_setup.branch_combobox.setCurrentText(repo_name)
 
         # Update advanced options
         window.ui_setup.update_advanced_options()
@@ -111,9 +119,11 @@ def on_repo_selection(window: Any):
 
 
 def on_fork_selection(window: Any):
-    fork_name = window.ui_setup.fork_combobox.currentText()
+    fork_name = window.ui_setup.branch_combobox.currentText()
 
-    fork = next((repo for repo in window.repo_manager.REPOS if repo["name"] == fork_name), None)
+    fork = next(
+        (repo for repo in window.repo_manager.REPOS if repo["name"] == fork_name), None
+    )
     if fork:
         window.repo_url = fork.get("url")
 
@@ -124,7 +134,9 @@ def on_fork_selection(window: Any):
         window.build_dependencies = fork.get("dependencies", [])
 
         # Update branch menu and other options
-        update_branch_menu(fork_name, window.repo_manager.REPOS, window.ui_setup.branch_menu)
+        update_branch_menu(
+            fork_name, window.repo_manager.REPOS, window.ui_setup.branch_menu
+        )
         window.repo_options = fork.get("options", {})
         window.build_manager.update_build_options(window.repo_options)
 
@@ -134,5 +146,36 @@ def on_fork_selection(window: Any):
         # Refresh the options layout
         window.ui_setup.refresh_options_layout()
 
-    print(f"Selected fork: {fork_name}, Options: {window.repo_options}")
+    # Update fork info
+    if "info" in fork:
+        info = fork["info"]
+        try:
+            image_path = os.path.join("config", "images", info.get("image", ""))
+            pixmap = QPixmap(image_path)
+            if not pixmap.isNull():
+                # Scale the pixmap to fit within the frame while maintaining aspect ratio
+                frame_size = window.ui_setup.image_frame.size()
+                scaled_pixmap = pixmap.scaled(frame_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                window.ui_setup.repo_image.setPixmap(scaled_pixmap)
+            else:
+                window.ui_setup.repo_image.clear()
 
+            trailer_link = info.get("trailer", "")
+            window.ui_setup.repo_trailer.setText(
+                f'<a href="{trailer_link}">Watch Trailer</a>'
+            )
+            window.ui_setup.repo_trailer.setOpenExternalLinks(True)
+
+            description = info.get("description", "")
+            window.ui_setup.repo_description.setText(description)
+        except Exception as e:
+            print(f"Error updating fork info: {e}")
+    else:
+        try:
+            window.ui_setup.repo_image.clear()
+            window.ui_setup.repo_trailer.clear()
+            window.ui_setup.repo_description.clear()
+        except Exception as e:
+            print(f"Error clearing fork info: {e}")
+
+    print(f"Selected fork: {fork_name}, Options: {window.repo_options}")

@@ -1,8 +1,8 @@
 import html
 import re
 
-from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal
-from PyQt6.QtGui import QColor, QPalette, QTextCursor, QFont, QTextOption
+from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal, QSize
+from PyQt6.QtGui import QColor, QPalette, QTextCursor, QFont, QTextOption, QPixmap
 from PyQt6.QtWidgets import (
     QLabel,
     QComboBox,
@@ -14,11 +14,12 @@ from PyQt6.QtWidgets import (
     QWidget,
     QGridLayout,
     QHBoxLayout,
-    QSizePolicy,
+    QVBoxLayout,
     QApplication,
+    QSplitter,
+    QFrame,
 )
 
-from src.ui.uiutils import add_horizontal_widgets
 from ui.build_option_utils import add_options_to_layout
 from ui.git_utils import CloningManager
 
@@ -69,8 +70,8 @@ class UISetup:
         self.clone_button = QPushButton("Clone", parent)
         self.options_widget = QWidget()
         self.options_layout = QGridLayout(self.options_widget)
-        self.fork_combobox = QComboBox()
-        self.fork_label = QLabel("Fork:")
+        self.branch_combobox = QComboBox()
+        self.branch_label = QLabel("Branch:")
 
         # Initialize color maps
         self.light_color_map = {
@@ -113,75 +114,106 @@ class UISetup:
 
         self.last_line = ""
 
+        self.repo_image = QLabel(parent)
+        self.repo_trailer = QLabel(parent)
+        self.repo_description = QTextEdit(parent)
+        self.repo_description.setReadOnly(True)
+
     def update_color_map(self):
         app = QApplication.instance()
         is_dark_theme = app.palette().color(QPalette.ColorRole.Window).lightness() < 128
         self.color_map = self.dark_color_map if is_dark_theme else self.light_color_map
 
     def setup(self):
-        self.parent.output_text = self.output_text
-        #self.output_text.setFixedHeight(300)
+        # Create a main horizontal layout
+        main_layout = QHBoxLayout()
 
-        self.setup_fork_section()
-        self.setup_directory_section()
-        self.setup_branch_section()
+        # Create a splitter for resizable sections
+        splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        self.parent.main_layout.addWidget(self.progress_bar)
-        self.parent.main_layout.addWidget(self.output_text)
+        # Left section (Fork info)
+        left_widget = QWidget()
+        left_widget.setFixedWidth(300)  # Set a fixed width for the fork info section
+        left_layout = QVBoxLayout(left_widget)
 
-        self.setup_advanced_options()
+        # Create a frame to contain the image
+        self.image_frame = QFrame()
+        self.image_frame.setFixedWidth(left_widget.width() - 20)  # Adjust for layout margins
+        self.image_frame.setFixedHeight(int(self.image_frame.width() * 9 / 16))  # 16:9 aspect ratio
+        image_layout = QVBoxLayout(self.image_frame)
+        image_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.repo_image.setScaledContents(False)  # Changed to False
+        self.repo_image.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center the image
+        image_layout.addWidget(self.repo_image)
 
-    def setup_fork_section(self):
-        self.parent.fork_collection = add_horizontal_widgets(
-            self.parent.main_layout,
-            (QLabel("Fork:"), (QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)),
-            (
-                self.fork_combobox,
-                (QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed),
-            ),
-            (self.clone_button, (QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)),
-        )
+        left_layout.addWidget(self.image_frame)
+        left_layout.addWidget(self.repo_trailer)
+        left_layout.addWidget(self.repo_description)
+        left_layout.addStretch(1)
+        splitter.addWidget(left_widget)
 
-    def setup_directory_section(self):
-        self.parent.directory_collection = add_horizontal_widgets(
-            self.parent.main_layout,
-            (
-                QLabel("Base Directory:"),
-                (QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed),
-            ),
-            (
-                self.clone_dir_entry,
-                (QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed),
-            ),
-            (
-                self.browse_button,
-                (QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed),
-            ),
-        )
+        # Right section (Existing content)
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        self.setup_existing_content(right_layout)
+        splitter.addWidget(right_widget)
 
-    def setup_branch_section(self):
-        self.parent.branch_collection = add_horizontal_widgets(
-            self.parent.main_layout,
-            (
-                QLabel("Branch:"),
-                (QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed),
-            ),
-            (self.branch_menu, (QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)),
-        )
+        # Set initial sizes for splitter
+        splitter.setSizes([left_widget.width(), 1100])  # Adjust these values as needed
 
-    def setup_advanced_options(self):
-        advanced_options_layout = QHBoxLayout()
-        advanced_options_layout.addWidget(
-            QLabel("Options:", self.parent), alignment=Qt.AlignmentFlag.AlignLeft
-        )
-        advanced_options_layout.addWidget(
-            self.advanced_checkbox, alignment=Qt.AlignmentFlag.AlignRight
-        )
+        # Add splitter to main layout
+        main_layout.addWidget(splitter)
 
-        self.parent.main_layout.addLayout(advanced_options_layout)
-        self.parent.main_layout.addWidget(
-            self.options_widget, alignment=Qt.AlignmentFlag.AlignTop
-        )
+        # Set the main layout
+        main_widget = QWidget()
+        main_widget.setLayout(main_layout)
+        self.parent.setCentralWidget(main_widget)
+
+        # Set the initial size of the main window
+        self.parent.resize(1400, 600)
+
+    def resizeEvent(self, event):
+        # Update image frame size when the window is resized
+        left_widget_width = self.parent.width() * 0.21  # Approximately 21% of window width
+        self.image_frame.setFixedWidth(left_widget_width - 20)  # Adjust for layout margins
+        self.image_frame.setFixedHeight(int(self.image_frame.width() * 9 / 16))  # 16:9 aspect ratio
+        super().resizeEvent(event)
+
+    def setup_existing_content(self, layout):
+        grid_layout = QGridLayout()
+
+        # Repository section
+        grid_layout.addWidget(self.repo_url_label, 0, 0)
+        repo_layout = QHBoxLayout()
+        repo_layout.addWidget(self.repo_url_combobox)
+        grid_layout.addLayout(repo_layout, 0, 1)
+
+        # Clone directory section
+        grid_layout.addWidget(QLabel("Clone Directory:"), 1, 0)
+        clone_dir_layout = QHBoxLayout()
+        clone_dir_layout.addWidget(self.clone_dir_entry)
+        clone_dir_layout.addWidget(self.browse_button)
+        grid_layout.addLayout(clone_dir_layout, 1, 1)
+
+        # Branch section
+        grid_layout.addWidget(self.branch_label, 2, 0)
+        grid_layout.addWidget(self.branch_menu, 2, 1)
+
+        # Advanced options
+        grid_layout.addWidget(self.advanced_checkbox, 3, 0, 1, 2)
+        grid_layout.addWidget(self.options_widget, 4, 0, 1, 2)
+
+        # Clone button
+        grid_layout.addWidget(self.clone_button, 5, 0, 1, 2)
+
+        # Progress bar
+        grid_layout.addWidget(self.progress_bar, 6, 0, 1, 2)
+
+        # Output text
+        grid_layout.addWidget(self.output_text, 7, 0, 1, 2)
+
+        layout.addLayout(grid_layout)
 
     def connect_signals(self):
         self.advanced_checkbox.stateChanged.connect(self.update_advanced_options)

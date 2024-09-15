@@ -15,7 +15,7 @@ class Mario64All(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Mario Sixty For All")
-        self.setFixedSize(700, 600)
+        # self.setFixedSize(1400, 600)
 
         self.main_widget = QWidget()
         self.main_layout = QVBoxLayout(self.main_widget)
@@ -74,9 +74,9 @@ class Mario64All(QMainWindow):
 
     def adjust_window_size(self):
         if self.ui_setup.advanced_checkbox.isChecked():
-            self.setFixedSize(700, 700)  # Adjust this size as needed
+            self.resize(900, 700)  # Adjust this size as needed
         else:
-            self.setFixedSize(700, 600)  # Original size
+            self.resize(900, 600)  # Original size
 
     def closeEvent(self, event):
         self.ui_setup.cleanup()
