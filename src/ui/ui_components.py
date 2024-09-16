@@ -1,6 +1,7 @@
 import html
 import os
 import re
+import sys
 
 from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette, QTextCursor, QFont, QTextOption, QPixmap
@@ -38,7 +39,7 @@ class UISetup:
         self.repo_url_combobox = QComboBox(parent)
         self.repo_url_combobox.currentIndexChanged.connect(self.on_repo_selection)
         self.repo_url_label = QLabel("Repository:")
-        self.clone_dir_entry = QLineEdit(parent)
+        self.install_dir_entry = QLineEdit(parent)
         self.branch_menu = QComboBox(parent)
         self.output_text = QTextEdit(parent)
         self.output_text.setReadOnly(True)
@@ -210,9 +211,9 @@ class UISetup:
         grid_layout.addLayout(repo_layout, 0, 1)
 
         # Clone directory section
-        grid_layout.addWidget(QLabel("Clone Directory:"), 1, 0)
+        grid_layout.addWidget(QLabel("Install Directory:"), 1, 0)
         clone_dir_layout = QHBoxLayout()
-        clone_dir_layout.addWidget(self.clone_dir_entry)
+        clone_dir_layout.addWidget(self.install_dir_entry)
         clone_dir_layout.addWidget(self.browse_button)
         grid_layout.addLayout(clone_dir_layout, 1, 1)
 
@@ -255,8 +256,8 @@ class UISetup:
         )
         if repo:
             self.parent.repo_url = repo.get("url")
-            default_dir = os.path.abspath(f"./{repo_name}")
-            self.clone_dir_entry.setText(default_dir)
+            default_dir = os.path.expanduser(f"~/{repo_name}")
+            self.install_dir_entry.setText(default_dir)
 
             self.parent.build_dependencies = repo.get("dependencies", [])
 
@@ -288,19 +289,34 @@ class UISetup:
     def update_repo_info(self, repo):
         info = repo.get("info", {})
 
+        # Debug: Print BASE_PATH
+        print(f"BASE_PATH: {BASE_PATH}")
+
         # Update image
-        image_path = os.path.join(BASE_PATH, "config", "images", info.get("image", ""))
+        image_name = info.get("image", "")
+        print(f"Image name from repo info: {image_name}")
+
+        image_path = os.path.join(BASE_PATH, "config", "images", image_name)
+        print(f"Full image path: {image_path}")
+        print(f"Image file exists: {os.path.exists(image_path)}")
+
         if os.path.exists(image_path):
             pixmap = QPixmap(image_path)
-            self.repo_image.setPixmap(
-                pixmap.scaled(
+            print(f"Pixmap is null: {pixmap.isNull()}")
+            if not pixmap.isNull():
+                scaled_pixmap = pixmap.scaled(
                     300,
                     200,
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation,
                 )
-            )
+                print(f"Scaled pixmap is null: {scaled_pixmap.isNull()}")
+                self.repo_image.setPixmap(scaled_pixmap)
+            else:
+                print(f"Failed to load image: {image_path}")
+                self.repo_image.clear()
         else:
+            print(f"Image file not found: {image_path}")
             self.repo_image.clear()
 
         # Update description

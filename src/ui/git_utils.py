@@ -1,5 +1,4 @@
 import os
-import sys
 from typing import Any
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal, Qt
@@ -67,14 +66,17 @@ def start_cloning(window: Any):
         window.start_cloning(repo_url, clone_dir, branch)
     else:
         window.ui_setup.update_output_text("Error: Selected repository not found.\n")
-        window.ui_setup.set_clone_button_enabled(True)  # Re-enable the button if there's an error
+        window.ui_setup.set_clone_button_enabled(
+            True
+        )  # Re-enable the button if there's an error
 
 
 def load_repos(repo_manager: Any):
     # Try to find the config directory
+    from ui.signal_connections import BASE_PATH
+
     config_dirs = [
         os.path.join(BASE_PATH, "config", "repos"),
-        os.path.join(sys._MEIPASS, "config", "repos") if hasattr(sys, "_MEIPASS") else None,
     ]
 
     repos_dir = next((d for d in config_dirs if d and os.path.exists(d)), None)
@@ -141,7 +143,7 @@ def on_fork_selection(window: Any):
         window.repo_url = fork.get("url")
 
         default_dir = os.path.abspath(f"./{fork_name}")
-        window.ui_setup.clone_dir_entry.setText(default_dir)
+        window.ui_setup.install_dir_entry.setText(default_dir)
 
         # Set dependencies
         window.build_dependencies = fork.get("dependencies", [])

@@ -69,4 +69,4 @@ class RepoManager:
     def browse_directory(self):
         directory = QFileDialog.getExistingDirectory(self.parent, "Select Directory")
         if directory:
-            self.parent.ui_setup.clone_dir_entry.setText(directory)
+            self.parent.ui_setup.install_dir_entry.setText(directory)
