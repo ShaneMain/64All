@@ -112,6 +112,11 @@ datas.extend(my_package_datas)
 yaml_files = [(os.path.join("config", "repos", f), "config/repos") for f in os.listdir("config/repos") if f.endswith(".yaml")]
 datas.extend(yaml_files)
 
+# Collect all image files from the config/images directory
+icon_file = os.path.join('config', 'images', 'basedtuxicon.ico')
+image_files = [(os.path.join("config", "images", f), "config/images") for f in os.listdir("config/images") if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))]
+datas.extend(image_files)
+
 # Predefined paths for PyQt6 plugins
 qt_plugins_path = os.path.join(os.path.dirname(PyQt6.__file__), "Qt6", "plugins")
 
@@ -151,6 +156,7 @@ exe = EXE(
     runtime_tmpdir=None,
     console=True,
     onefile=True,
+    icon=icon_file,
 )
 
 # Collect all components into a single package
