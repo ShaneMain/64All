@@ -1,4 +1,16 @@
+import os
+import sys
+
 from src.ui.git_utils import start_cloning
+
+if getattr(sys, "frozen", False):
+    # Running in a PyInstaller bundle
+    BASE_PATH = sys._MEIPASS
+else:
+    # Running in a normal Python environment
+    BASE_PATH = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
 
 
 def connect_signals(window):

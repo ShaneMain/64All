@@ -1,6 +1,10 @@
 import os
+
 import yaml
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
+from PyQt6.QtWidgets import QFileDialog
+
+from ui.signal_connections import BASE_PATH
+
 
 class RepoManager:
     def __init__(self, parent):
@@ -8,17 +12,19 @@ class RepoManager:
         self.REPOS = []
 
     def load_repos(self):
-        config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config', 'repos')
+        config_dir = os.path.join(BASE_PATH, "config", "repos")
         if not os.path.exists(config_dir):
-            print(f"The repos directory was not found at {config_dir}. Please make sure it exists.")
+            print(
+                f"The repos directory was not found at {config_dir}. Please make sure it exists."
+            )
             return
 
         self.REPOS = []
         for filename in os.listdir(config_dir):
-            if filename.endswith('.yaml'):
+            if filename.endswith(".yaml"):
                 file_path = os.path.join(config_dir, filename)
                 try:
-                    with open(file_path, 'r') as file:
+                    with open(file_path, "r") as file:
                         repo_data = yaml.safe_load(file)
                         if isinstance(repo_data, list):
                             self.REPOS.extend(repo_data)
@@ -30,12 +36,14 @@ class RepoManager:
                     print(f"Error loading {filename}: {str(e)}")
 
         if not self.REPOS:
-            print("No valid repository configurations were found in the repos directory.")
+            print(
+                "No valid repository configurations were found in the repos directory."
+            )
         else:
             print(f"Total repos loaded: {len(self.REPOS)}")
 
     def populate_repo_urls(self):
-        if not hasattr(self.parent, 'ui_setup') or self.parent.ui_setup is None:
+        if not hasattr(self.parent, "ui_setup") or self.parent.ui_setup is None:
             print("UI setup not initialized yet. Skipping repo URL population.")
             return
 

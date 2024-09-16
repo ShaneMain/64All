@@ -1,12 +1,14 @@
 import os
 
 from PyQt6.QtCore import QTimer
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QMainWindow
 
 from src.core.romfinder import N64RomValidator
 from .build_manager import BuildManager
 from .git_utils import CloningManager
 from .repo_manager import RepoManager
+from .signal_connections import BASE_PATH
 from .ui_components import UISetup
 
 
@@ -19,10 +21,19 @@ class Mario64All(QMainWindow):
         self.cloning_manager = CloningManager()
         self.repo_url = ""
         self.rom_region, self.rom_dir = N64RomValidator().find_or_select_file()
+
         self.build_dependencies = []
         self.workspace = os.path.abspath("./.workspace")
         self.repo_options = {}
+        self.set_top_bar()
         self.setup_ui()
+
+    def set_top_bar(self):
+        self.setWindowTitle("64All")
+        # Construct the path to the icon file
+        icon_path = os.path.join(BASE_PATH, "config", "images", "basedtuxicon.ico")
+        icon = QIcon(icon_path)
+        self.setWindowIcon(icon)
 
     def setup_ui(self):
         self.ui_setup = UISetup(self)  # Create UISetup instance

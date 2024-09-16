@@ -4,7 +4,7 @@ import yaml
 
 from core.distrobox import run_ephemeral_command
 from src.core.buildlogic import symlink_file_to_dir
-from src.ui.build_option_utils import add_options_to_layout
+from ui.signal_connections import BASE_PATH
 
 
 class BuildManager:
@@ -21,7 +21,7 @@ class BuildManager:
         )
         print(self.parent.build_dependencies)
 
-        command = "make -j4 " + " ".join(
+        command = "make -j$(nproc) " + " ".join(
             [f"{k}={v}" for k, v in self.user_selections.items()]
         )
 
@@ -30,9 +30,8 @@ class BuildManager:
             ui_setup=self.parent.ui_setup,
             directory=self.parent.workspace,
             additional_packages=self.parent.build_dependencies,
+            on_complete=self.build_finished,
         )
-
-        # The build_finished method will be called via the ui_setup's update_output_text method
 
     def build_finished(self, success):
         if success:
@@ -46,7 +45,7 @@ class BuildManager:
 
     def load_repo_configs(self):
         repo_configs = {}
-        config_dir = "config/repos/"
+        config_dir = os.path.join(BASE_PATH, "config", "repos")     
 
         for filename in os.listdir(config_dir):
             if filename.endswith(".yaml"):
@@ -59,11 +58,11 @@ class BuildManager:
 
     def update_build_options(self, repo_options=None):
         current_repo = self.parent.ui_setup.repo_url_combobox.currentText()
-        
+
         if not current_repo:
             print("No repository selected. Please select a repository first.")
             return
-        
+
         if repo_options is None:
             repo_options = self.parent.repo_options.get(current_repo, {})
 
@@ -83,6 +82,7 @@ class BuildManager:
 
         # Rebuild the layout
         from ui.build_option_utils import add_options_to_layout
+
         add_options_to_layout(self.parent, repo_options)
 
         # Restore selections, using recommended or default values for new options

@@ -196,6 +196,7 @@ def run_ephemeral_command(
     ui_setup: UISetup = None,
     directory=".",
     additional_packages: list = None,
+    on_complete: callable = None,  # Added parameter for completion callback
 ):
     async def run():
         manager = DistroboxManager(
@@ -203,24 +204,27 @@ def run_ephemeral_command(
         )
         try:
             await manager.create(True, command, additional_packages=additional_packages)
-            if ui_setup:
-                ui_setup.update_output_text("Command executed successfully in ephemeral container.\n")
             return True
         except RuntimeError as e:
+            error_message = f"Error: {str(e)}"
             if ui_setup:
-                ui_setup.update_output_text(f"Error: {str(e)}\n")
-            print(f"Error: {str(e)}")
+                ui_setup.update_output_text(f"{error_message}\n")
+            print(error_message)
             return False
 
     def run_async():
         success = asyncio.run(run())
         if ui_setup:
-            if success:
-                ui_setup.update_output_text("Ephemeral command completed successfully.\n")
-            else:
-                ui_setup.update_output_text("Ephemeral command failed. Check the output for errors.\n")
+            status_message = (
+                "Ephemeral command completed successfully.\n"
+                if success
+                else "Ephemeral command failed. Check the output for errors.\n"
+            )
+            ui_setup.update_output_text(status_message)
+        if on_complete:
+            on_complete(success)  # Call the callback with the success status
 
-    QTimer.singleShot(0, run_async)
+    return QTimer.singleShot(0, run_async)
 
 
 if __name__ == "__main__":

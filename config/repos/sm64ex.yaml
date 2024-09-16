@@ -1,6 +1,7 @@
 - name: sm64ex
   url: "https://github.com/sm64pc/sm64ex.git"
-  dependencies: [ "hexdump", "libglew-dev", "libsdl2-dev" ]
+  #dependencies: [ "hexdump", "libglew-dev", "libsdl2-dev" ] dependencies listed on the repo dont work lol
+  dependencies: [ "build-essential", "libglew-dev", "libsdl2-dev" ]
   info:
     description: "This is a fork of the sm64-port project, featuring enhanced functionalities including a customizable options menu, external data loading for textures and soundbanks, and support for various rendering modes like OpenGL1.3 and D3D12. It allows for button remapping, optional camera controls, and fixes for models and textures. Users can skip certain cutscenes, access a cheats menu, and handle save files in both little-endian and big-endian formats. Recent updates have changed the default save and configuration file paths, which can be customized via the CLI."
     image: "sm64ex.png"

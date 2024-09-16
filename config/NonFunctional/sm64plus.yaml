@@ -1,0 +1,20 @@
+- name: SM64Plus
+  url: "https://github.com/MorsGames/sm64plus"
+  #dependencies: [ "build-essential", "pkg-config", "libsdl2-dev", "libusb-1.0-0-dev" ] dependencies listed on the repo dont work lol
+  dependencies: [ "build-essential", "libglew-dev", "libsdl2-dev", "libusb-1.0-0-dev", "pkg-config" ]
+  info:
+    description: "SM64Plus is an enhanced version of the SM64-port that prioritizes customizability and gameplay improvements. It offers more responsive controls, an upgraded camera system, and an expanded moveset, along with the ability to continue playing after collecting a star. Additional features include optional extra modes, 60FPS support through interpolation, and numerous bug fixes to address issues in the base game."
+    trailer: https://www.youtube.com/watch?v=bJ9-XwZBvqU
+    image: "sm64plus.jpg"
+  options:
+    TARGET_32BIT:
+      default: 0
+      values: [ 0, 1 ]
+      description: 'Please note that 32-bit Linux builds are not tested.'
+      advanced: true
+    COMPILER:
+      recommended: "gcc"
+      default: "ido"
+      values: [ "ido", "gcc" ]
+      description: 'Please note that 32-bit Linux builds are not tested.'
+      advanced: true

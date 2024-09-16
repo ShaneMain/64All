@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 
 from ui.build_option_utils import add_options_to_layout
 from ui.git_utils import CloningManager
+from ui.signal_connections import BASE_PATH
 
 
 class GitProgress(QObject):
@@ -265,6 +266,11 @@ class UISetup:
                 repo_name, self.parent.repo_manager.REPOS, self.branch_menu
             )
 
+            # Clear existing options
+            self.parent.repo_options = {}
+            self.parent.build_manager.user_selections = {}
+
+            # Update with new repo options
             self.parent.repo_options = repo.get("options", {})
             self.parent.build_manager.update_build_options(self.parent.repo_options)
 
@@ -272,37 +278,42 @@ class UISetup:
 
             self.update_advanced_options()
 
-            # Update image
-            info = repo.get("info", {})
-            image_path = os.path.join("config", "images", info.get("image", ""))
-            if os.path.exists(image_path):
-                pixmap = QPixmap(image_path)
-                self.repo_image.setPixmap(
-                    pixmap.scaled(
-                        300,
-                        200,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                )
-            else:
-                self.repo_image.clear()
-
-            # Update description
-            description = info.get("description", "No description available.")
-            self.repo_description.setPlainText(description)
-
-            # Update trailer
-            trailer_link = info.get("trailer", "")
-            if trailer_link:
-                self.repo_trailer.setText(f'<a href="{trailer_link}">Watch Trailer</a>')
-                self.repo_trailer.setOpenExternalLinks(True)
-            else:
-                self.repo_trailer.clear()
+            # Update image and other info
+            self.update_repo_info(repo)
 
             print(f"Selected repo: {repo_name}, Options: {self.parent.repo_options}")
         else:
             print(f"Repository {repo_name} not found in loaded repos.")
+
+    def update_repo_info(self, repo):
+        info = repo.get("info", {})
+
+        # Update image
+        image_path = os.path.join(BASE_PATH, "config", "images", info.get("image", ""))
+        if os.path.exists(image_path):
+            pixmap = QPixmap(image_path)
+            self.repo_image.setPixmap(
+                pixmap.scaled(
+                    300,
+                    200,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+        else:
+            self.repo_image.clear()
+
+        # Update description
+        description = info.get("description", "No description available.")
+        self.repo_description.setPlainText(description)
+
+        # Update trailer
+        trailer_link = info.get("trailer", "")
+        if trailer_link:
+            self.repo_trailer.setText(f'<a href="{trailer_link}">Watch Trailer</a>')
+            self.repo_trailer.setOpenExternalLinks(True)
+        else:
+            self.repo_trailer.clear()
 
     def update_build_options(self, repo_options):
         for i in reversed(range(self.parent.ui_setup.options_layout.count())):
@@ -346,6 +357,9 @@ class UISetup:
         )
         if build_target_widget:
             build_target_widget.setVisible(True)
+
+    def set_clone_button_enabled(self, enabled):
+        self.clone_button.setEnabled(enabled)
 
     def update_output_text(self, text):
         # Replace carriage returns with newlines, but only if it's not followed by a newline
