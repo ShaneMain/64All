@@ -1,13 +1,14 @@
 import asyncio
 import os
 import shutil
+import subprocess
 import sys
 
 from PyQt6.QtCore import QThread, pyqtSignal, QObject, QEventLoop, pyqtSlot
 from PyQt6.QtWidgets import QApplication, QTextEdit
 
 from core.dependency_utils import install_packages
-from ui.ui_components import UISetup
+from ui.ui_setup import UISetup
 
 
 class Worker(QThread):
@@ -183,7 +184,7 @@ class DistroboxManager(QObject):
         """Append text to the QTextEdit box."""
         print(text)
         if self.ui_setup:
-            self.ui_setup.update_output_text(text)
+            self.ui_setup.output_text_manager.update_output_text(text)
 
     @pyqtSlot()
     def worker_finished(self):
@@ -196,7 +197,7 @@ def run_ephemeral_command(
     ui_setup: UISetup = None,
     directory=".",
     additional_packages: list = None,
-    on_complete: callable = None,  # Added parameter for completion callback
+    on_complete: callable = None,
 ):
     async def run():
         manager = DistroboxManager(
@@ -208,7 +209,7 @@ def run_ephemeral_command(
         except RuntimeError as e:
             error_message = f"Error: {str(e)}"
             if ui_setup:
-                ui_setup.update_output_text(f"{error_message}\n")
+                ui_setup.output_text_manager.update_output_text(f"{error_message}\n")
             print(error_message)
             return False
 
@@ -220,11 +221,21 @@ def run_ephemeral_command(
                 if success
                 else "Ephemeral command failed. Check the output for errors.\n"
             )
-            ui_setup.update_output_text(status_message)
+            ui_setup.output_text_manager.update_output_text(status_message)
         if on_complete:
-            on_complete(success)  # Call the callback with the success status
+            on_complete(success)
 
     run_async()
+
+
+def cleanup_ubuntu_image():
+    """Remove the Ubuntu image used by Distrobox."""
+    command = "podman rmi ubuntu:latest -f"
+    process = subprocess.run(command, shell=True, capture_output=True, text=True)
+    if process.returncode == 0:
+        print("Ubuntu image removed successfully.")
+    else:
+        print(f"Failed to remove Ubuntu image: {process.stderr}")
 
 
 if __name__ == "__main__":
@@ -236,6 +247,9 @@ if __name__ == "__main__":
         "sudo apt-get update -y && sudo apt-get install neofetch -y && neofetch",
         text_box,
     )
+
+    # Connect the cleanup function to the app's aboutToQuit signal
+    app.aboutToQuit.connect(cleanup_ubuntu_image)
 
     exit_code = app.exec()
     sys.exit(exit_code)

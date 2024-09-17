@@ -4,11 +4,11 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QMainWindow
 
 from src.core.romfinder import N64RomValidator
+from ui.UIManagers.repo_manager import RepoManager
 from .build_manager import BuildManager
 from .git_utils import CloningManager
-from .repo_manager import RepoManager
 from .signal_connections import BASE_PATH
-from .ui_components import UISetup
+from .ui_setup import UISetup
 
 
 class Sixty4All(QMainWindow):
@@ -45,10 +45,10 @@ class Sixty4All(QMainWindow):
         self.ui_setup.update_progress_bar(value)
 
     def update_output_text(self, text):
-        self.ui_setup.update_output_text(text)
+        self.ui_setup.output_text_manager.update_output_text(text)
 
     def start_cloning(self, repo_url, clone_dir, branch):
-        self.ui_setup.update_output_text(
+        self.ui_setup.output_text_manager.update_output_text(
             f"Initiating cloning: {repo_url} to {clone_dir} (branch: {branch})\n"
         )
         self.cloning_manager.progress_signal.connect(self.update_progress_bar)
@@ -66,7 +66,6 @@ class Sixty4All(QMainWindow):
                 "[31mCloning failed. Check the output for errors.[0m\n"
             )
             self.update_output_text("[33mYou may need to try cloning again.[0m\n")
-
 
     def update_build_options(self, repo_options):
         self.build_manager.update_build_options(repo_options)

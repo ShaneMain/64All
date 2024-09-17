@@ -14,9 +14,6 @@ else:
 
 
 def connect_signals(window):
-    # UI Setup signals
-    window.ui_setup.connect_signals()
-
     # Repo Manager signals
     window.ui_setup.clone_button.clicked.connect(lambda: start_cloning(window))
     window.ui_setup.repo_url_combobox.currentIndexChanged.connect(

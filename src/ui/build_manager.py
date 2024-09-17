@@ -2,8 +2,9 @@ import os
 import shutil
 
 import yaml
-from PyQt6.QtCore import QUrl
+from PyQt6.QtCore import QUrl, Qt
 from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtWidgets import QWidget, QCheckBox, QSpinBox, QComboBox
 
 from core.distrobox import run_ephemeral_command
 from src.core.buildlogic import symlink_file_to_dir
@@ -38,13 +39,13 @@ class BuildManager:
 
     def build_finished(self, success):
         if success:
-            self.parent.ui_setup.update_output_text(
+            self.parent.ui_setup.output_text_manager.update_output_text(
                 "[32m Build completed successfully! [0m"
             )
             self.handle_post_install()
 
         else:
-            self.parent.ui_setup.update_output_text(
+            self.parent.ui_setup.output_text_manager.update_output_text(
                 "[31m Build failed. Check the output for errors. [0m"
             )
         self.parent.ui_setup.set_build_button_enabled(True)
@@ -61,6 +62,28 @@ class BuildManager:
                         repo_configs[repo["name"]] = repo
 
         return repo_configs
+
+    def create_checkbox_handler(window, opt_name):
+        def handler(state):
+            value = 1 if state == Qt.CheckState.Checked else 0
+            window.build_manager.update_user_selection(opt_name, value)
+            print(f"Updated {opt_name} to {value}")  # Debug print
+
+        return handler
+
+    def create_combobox_handler(window, opt_name):
+        def handler(value):
+            window.build_manager.update_user_selection(opt_name, value)
+            print(f"Updated {opt_name} to {value}")  # Debug print
+
+        return handler
+
+    def create_spinbox_handler(window, opt_name):
+        def handler(value):
+            window.build_manager.update_user_selection(opt_name, value)
+            print(f"Updated {opt_name} to {value}")  # Debug print
+
+        return handler
 
     def update_build_options(self, repo_options=None):
         current_repo = self.parent.ui_setup.repo_url_combobox.currentText()
@@ -79,17 +102,8 @@ class BuildManager:
         # Store current selections
         current_selections = self.user_selections.copy()
 
-        # Clear the layout
-        for i in reversed(range(self.parent.ui_setup.options_layout.count())):
-            widget = self.parent.ui_setup.options_layout.itemAt(i).widget()
-            if widget:
-                self.parent.ui_setup.options_layout.removeWidget(widget)
-                widget.setParent(None)
-
-        # Rebuild the layout
-        from ui.build_option_utils import add_options_to_layout
-
-        add_options_to_layout(self.parent, repo_options)
+        # Clear the layout and disconnect signals
+        self.clear_options_layout()
 
         # Restore selections, using recommended or default values for new options
         for opt_name, opt_info in repo_options.items():
@@ -105,10 +119,35 @@ class BuildManager:
                 elif default_value is not None:
                     self.update_user_selection(opt_name, default_value)
 
+        # Update UI widgets with current selections
+        self.update_ui_widgets()
+
+    def clear_options_layout(self):
+        layout = self.parent.ui_setup.options_layout
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.setParent(None)
+
+    def update_ui_widgets(self):
+        for opt_name, value in self.user_selections.items():
+            widget = self.parent.ui_setup.options_layout.findChild(
+                QWidget, f"{opt_name}_widget"
+            )
+            if widget:
+                if isinstance(widget, QCheckBox):
+                    widget.setChecked(bool(value))
+                elif isinstance(widget, QComboBox):
+                    widget.setCurrentText(str(value))
+                elif isinstance(widget, QSpinBox):
+                    widget.setValue(int(value))
+
     def update_user_selection(self, option_name, value):
+        old_value = self.user_selections.get(option_name, None)
         self.user_selections[option_name] = value
-        # Update the UI to reflect the new selection
-        # This part depends on how your UI is structured
+        print(f"BuildManager: Updated {option_name} from {old_value} to {value}")
+        print(f"Current user_selections: {self.user_selections}")
 
     def get_build_target(self):
         if self.user_selections.get("OSX_BUILD", 0) == 1:
@@ -167,6 +206,6 @@ class BuildManager:
         print(f"Opened target directory: {target_dir}")
 
         # Inform the user that the process is complete
-        self.parent.ui_setup.update_output_text(
+        self.parent.ui_setup.output_text_manager.update_output_text(
             "Installation complete. Opening target directory.\n"
         )
