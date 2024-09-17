@@ -32,10 +32,3 @@ def connect_signals(window):
 
     # Build Manager signals
     # Add any build-related signals here
-
-
-def cloning_finished(window, success):
-    if not success:
-        return
-    window.ui_setup.update_output_text("Cloning finished!")
-    window.build_manager.start_building()

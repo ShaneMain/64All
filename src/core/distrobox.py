@@ -3,7 +3,7 @@ import os
 import shutil
 import sys
 
-from PyQt6.QtCore import QThread, pyqtSignal, QObject, QEventLoop, pyqtSlot, QTimer
+from PyQt6.QtCore import QThread, pyqtSignal, QObject, QEventLoop, pyqtSlot
 from PyQt6.QtWidgets import QApplication, QTextEdit
 
 from core.dependency_utils import install_packages
@@ -224,7 +224,7 @@ def run_ephemeral_command(
         if on_complete:
             on_complete(success)  # Call the callback with the success status
 
-    return QTimer.singleShot(0, run_async)
+    run_async()
 
 
 if __name__ == "__main__":

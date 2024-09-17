@@ -1,6 +1,9 @@
 import os
+import shutil
 
 import yaml
+from PyQt6.QtCore import QUrl
+from PyQt6.QtGui import QDesktopServices
 
 from core.distrobox import run_ephemeral_command
 from src.core.buildlogic import symlink_file_to_dir
@@ -38,14 +41,17 @@ class BuildManager:
             self.parent.ui_setup.update_output_text(
                 "[32m Build completed successfully! [0m"
             )
+            self.handle_post_install()
+
         else:
             self.parent.ui_setup.update_output_text(
                 "[31m Build failed. Check the output for errors. [0m"
             )
+        self.parent.ui_setup.set_build_button_enabled(True)
 
     def load_repo_configs(self):
         repo_configs = {}
-        config_dir = os.path.join(BASE_PATH, "config", "repos")     
+        config_dir = os.path.join(BASE_PATH, "config", "repos")
 
         for filename in os.listdir(config_dir):
             if filename.endswith(".yaml"):
@@ -117,3 +123,50 @@ class BuildManager:
             return "Raspberry Pi"
         else:
             return "Linux"
+
+    def handle_post_install(self):
+        install_dir = os.path.join(self.parent.workspace, "build/us_pc/")
+        print(f"Install directory: {install_dir}")
+        target_dir = self.parent.ui_setup.install_dir_entry.text()
+        print(f"Target directory: {target_dir}")
+
+        def copy_and_overwrite(src, dst):
+            if os.path.isdir(src):
+                if not os.path.exists(dst):
+                    os.makedirs(dst)
+                for item in os.listdir(src):
+                    s = os.path.join(src, item)
+                    d = os.path.join(dst, item)
+                    copy_and_overwrite(s, d)
+            else:
+                shutil.copy2(src, dst)
+
+        # Copy and overwrite contents of install_dir to target_dir
+        copy_and_overwrite(install_dir, target_dir)
+        print(f"Copied contents from {install_dir} to {target_dir}")
+
+        repo_name = self.parent.ui_setup.repo_url_combobox.currentText()
+
+        # Find the file that starts with 'sm64' and rename it to repo_name
+        for filename in os.listdir(target_dir):
+            if filename.startswith("sm64"):
+                old_path = os.path.join(target_dir, filename)
+                new_path = os.path.join(target_dir, repo_name)
+                os.rename(old_path, new_path)
+                print(f"Renamed {old_path} to {new_path}")
+                break  # Exit after renaming the first match
+
+        # Delete the workspace directory recursively
+        workspace_dir = self.parent.workspace
+        if os.path.exists(workspace_dir):
+            shutil.rmtree(workspace_dir)
+            print(f"Deleted workspace directory: {workspace_dir}")
+
+        # Open the target directory in the user's GUI file manager
+        QDesktopServices.openUrl(QUrl.fromLocalFile(target_dir))
+        print(f"Opened target directory: {target_dir}")
+
+        # Inform the user that the process is complete
+        self.parent.ui_setup.update_output_text(
+            "Installation complete. Opening target directory.\n"
+        )

@@ -61,7 +61,7 @@ class CloneWorker(QObject):
             progress = CloneProgress(self.text_signal, self.progress_signal)
             
             # Use single-branch cloning
-            repo = git.Repo.clone_from(
+            git.Repo.clone_from(
                 self.repo_url,
                 self.clone_dir,
                 branch=self.branch,

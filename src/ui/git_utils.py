@@ -56,7 +56,7 @@ class CloningManager(QObject):
 
 def start_cloning(window: Any):
     window.ui_setup.update_output_text("Starting cloning process...\n")
-    window.ui_setup.set_clone_button_enabled(False)  # Disable the button
+    window.ui_setup.set_build_button_enabled(False)  # Disable the button
     repo_name = window.ui_setup.repo_url_combobox.currentText()
     repo = next((r for r in window.repo_manager.REPOS if r["name"] == repo_name), None)
     if repo:
@@ -66,7 +66,7 @@ def start_cloning(window: Any):
         window.start_cloning(repo_url, clone_dir, branch)
     else:
         window.ui_setup.update_output_text("Error: Selected repository not found.\n")
-        window.ui_setup.set_clone_button_enabled(
+        window.ui_setup.set_build_button_enabled(
             True
         )  # Re-enable the button if there's an error
 

@@ -1,7 +1,6 @@
 import html
 import os
 import re
-import sys
 
 from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette, QTextCursor, QFont, QTextOption, QPixmap
@@ -73,7 +72,7 @@ class UISetup:
         self.progress_bar = QProgressBar(parent)
         self.advanced_checkbox = QCheckBox("Show advanced options")
         self.browse_button = QPushButton("Browse...", parent)
-        self.clone_button = QPushButton("Clone", parent)
+        self.clone_button = QPushButton("Build", parent)
         self.options_widget = QWidget()
         self.options_layout = QGridLayout(self.options_widget)
         self.branch_combobox = QComboBox()
@@ -374,25 +373,26 @@ class UISetup:
         if build_target_widget:
             build_target_widget.setVisible(True)
 
-    def set_clone_button_enabled(self, enabled):
+    def set_build_button_enabled(self, enabled):
         self.clone_button.setEnabled(enabled)
 
     def update_output_text(self, text):
-        # Replace carriage returns with newlines, but only if it's not followed by a newline
-        text = re.sub(r"\r(?!\n)", "\n", text)
+        # Replace carriage returns with newlines, but only if not followed by a newline
+        text = re.sub(r'\r(?!\n)', '\n', text)
 
         # Split the text into lines
-        lines = text.split("\n")
+        lines = text.split('\n')
 
         for line in lines:
+            # Remove lone brackets and leading/trailing spaces, but keep color codes
+            line = re.sub(r'(?<!\[)\s*\[(?!\d+m)|\](?!\s*\[)\s*', '', line)
+            
             # If the new line starts with the same content as the last line,
             # replace the last line instead of adding a new one
-            if self.last_line and line.startswith(self.last_line):
-                self.text_buffer = (
-                    self.text_buffer[: -len(self.last_line)] + line + "\n"
-                )
+            if self.last_line and line.startswith(self.last_line.rstrip()):
+                self.text_buffer = self.text_buffer[:-len(self.last_line)] + line + '\n'
             else:
-                self.text_buffer += line + "\n"
+                self.text_buffer += line + '\n'
 
             # Update the last line
             self.last_line = line
@@ -400,6 +400,33 @@ class UISetup:
         # If the buffer is getting too large, force an update
         if len(self.text_buffer) > 4096:
             self.flush_text_buffer()
+
+    def flush_text_buffer(self):
+        if not self.text_buffer:
+            return
+
+        cursor = self.output_text.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+
+        # Split the text by color codes, preserving newlines
+        parts = re.split(r'(\[(?:\d+;)*\d+m)', self.text_buffer)
+
+        html_text = ""
+        current_color = self.color_map["0"]  # Start with default color
+
+        for part in parts:
+            if part.startswith('[') and part.endswith('m'):  # This is a color code
+                color_code = part[1:-1].split(';')[-1]  # Get the last number in the color code
+                current_color = self.color_map.get(color_code, self.color_map["0"])
+            else:  # This is text content
+                # Escape special HTML characters and replace newlines with <br>
+                escaped_part = html.escape(part).replace('\n', '<br>')
+                html_text += f'<span style="color:{current_color.name()};">{escaped_part}</span>'
+
+        cursor.insertHtml(html_text)
+        self.output_text.setTextCursor(cursor)
+        self.output_text.ensureCursorVisible()
+        self.text_buffer = ""
 
     def flush_text_buffer(self):
         if not self.text_buffer:
@@ -423,6 +450,33 @@ class UISetup:
                 html_text += (
                     f'<span style="color:{current_color.name()};">{escaped_part}</span>'
                 )
+
+        cursor.insertHtml(html_text)
+        self.output_text.setTextCursor(cursor)
+        self.output_text.ensureCursorVisible()
+        self.text_buffer = ""
+
+    def flush_text_buffer(self):
+        if not self.text_buffer:
+            return
+
+        cursor = self.output_text.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+
+        # Split the text by color codes, preserving newlines
+        parts = re.split(r'(\[(?:\d+;)*\d+m)', self.text_buffer)
+
+        html_text = ""
+        current_color = self.color_map["0"]  # Start with default color
+
+        for part in parts:
+            if part.startswith('[') and part.endswith('m'):  # This is a color code
+                color_code = part[1:-1].split(';')[-1]  # Get the last number in the color code
+                current_color = self.color_map.get(color_code, self.color_map["0"])
+            else:  # This is text content
+                # Escape special HTML characters and replace newlines with <br>
+                escaped_part = html.escape(part).replace('\n', '<br>')
+                html_text += f'<span style="color:{current_color.name()};">{escaped_part}</span>'
 
         cursor.insertHtml(html_text)
         self.output_text.setTextCursor(cursor)
@@ -458,7 +512,7 @@ class UISetup:
         if success:
             self.ui_setup.update_output_text("[32mCloning finished successfully![0m\n")
             self.ui_setup.update_output_text("[32mStarting build process...[0m\n")
-            QTimer.singleShot(0, self.build_manager.start_building)
+            self.build_manager.start_building()
         else:
             self.ui_setup.update_output_text(
                 "[31mCloning failed. Check the output for errors.[0m\n"

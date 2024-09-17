@@ -1,6 +1,5 @@
 import os
 
-from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QMainWindow
 
@@ -12,7 +11,7 @@ from .signal_connections import BASE_PATH
 from .ui_components import UISetup
 
 
-class Mario64All(QMainWindow):
+class Sixty4All(QMainWindow):
     def __init__(self):
         super().__init__()
         self.repo_manager = RepoManager(self)
@@ -61,12 +60,13 @@ class Mario64All(QMainWindow):
         if success:
             self.update_output_text("[32mCloning finished successfully![0m\n")
             self.update_output_text("[32mStarting build process...[0m\n")
-            QTimer.singleShot(0, self.build_manager.start_building)
+            self.build_manager.start_building()
         else:
             self.update_output_text(
                 "[31mCloning failed. Check the output for errors.[0m\n"
             )
             self.update_output_text("[33mYou may need to try cloning again.[0m\n")
+
 
     def update_build_options(self, repo_options):
         self.build_manager.update_build_options(repo_options)
