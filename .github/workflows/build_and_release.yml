@@ -3,18 +3,15 @@ name: Build and Release
 on:
   push:
     branches:
-      - main
-      - development
       - '**'
   workflow_dispatch:
 
 permissions:
-  contents: write  # Ensure GITHUB_TOKEN has write permissions
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     container:
       image: fedora:latest
 
@@ -39,8 +36,8 @@ jobs:
         shell: bash
         run: |
           source ~/.bashrc
-          pyenv install 3.11.5
-          pyenv virtualenv 3.11.5 venv-3.11.5
+          pyenv install 3.10.0
+          pyenv virtualenv 3.10.0 venv-3.10.0
 
       - name: Set up Poetry
         shell: bash
@@ -52,44 +49,45 @@ jobs:
         shell: bash
         run: |
           source ~/.bashrc
-          pyenv activate venv-3.11.5
+          pyenv activate venv-3.10.0
           poetry install --no-root
 
       - name: Install PyInstaller
         shell: bash
         run: |
           source ~/.bashrc
-          pyenv activate venv-3.11.5
+          pyenv activate venv-3.10.0
           pip install pyinstaller
 
       - name: Run build script
         shell: bash
         run: |
           source ~/.bashrc
-          pyenv activate venv-3.11.5
+          pyenv activate venv-3.10.0
           chmod +x ./scripts/build.sh
           ./scripts/build.sh
 
-      - name: Generate unique tag
-        id: generate_tag
-        run: |
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          TAG_NAME="${GITHUB_REF_NAME}-${TIMESTAMP}"
-          echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_ENV
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: 64All
+          path: ./dist/64All
 
       - name: Create Release
+        if: github.ref == 'refs/heads/master'
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.TAG_NAME }}
-          release_name: Release ${{ env.TAG_NAME }}
-          body: Automated release for ${{ env.TAG_NAME }}
+          tag_name: ${{ github.sha }}
+          release_name: Release ${{ github.sha }}
+          body: Automated release for ${{ github.sha }}
           draft: false
           prerelease: false
 
       - name: Upload Release Asset
+        if: github.ref == 'refs/heads/master'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
