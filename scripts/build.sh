@@ -1,4 +1,4 @@
-    #!/bin/bash
+#!/bin/bash
 
 set -e
 
@@ -15,13 +15,13 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 
 # Ensure the virtual environment exists
-if ! pyenv virtualenvs | grep -q "venv-3.11.5"; then
-    pyenv virtualenv 3.11.5 venv-3.11.5
+if ! pyenv virtualenvs | grep -q "venv-3.10"; then
+    pyenv virtualenv 3.10.5 venv-3.10.5
 fi
 
 # Activate the virtual environment if not already active
 if ! is_venv_active; then
-    pyenv activate venv-3.11.5
+    pyenv activate venv-3.10.5
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
@@ -46,16 +46,16 @@ poetry install
 
 poetry run python3 -m pip install toml pyqt6 modulegraph gitpython pyyaml
 
-PYTHON_PREFIX=$(pyenv prefix 3.11.5)
-LIB_PYTHON_PATH="$PYTHON_PREFIX/lib/libpython3.11.so.1.0"
+PYTHON_PREFIX=$(pyenv prefix 3.10.5)
+LIB_PYTHON_PATH="$PYTHON_PREFIX/lib/libpython3.10.so.1.0"
 
 if [ ! -f "$LIB_PYTHON_PATH" ]; then
-    echo "Error: libpython3.11.so.1.0 was not found in pyenv directories."
+    echo "Error: libpython3.10.so.1.0 was not found in pyenv directories."
     exit 1
 fi
 
 LIB_TYPE=$(file "$LIB_PYTHON_PATH")
-if ! echo "$LIB_TYPE" | grep -q "64-bit"; then  
+if ! echo "$LIB_TYPE" | grep -q "64-bit"; then
     echo "Error: The library at $LIB_PYTHON_PATH is not a 64-bit version."
     exit 1
 fi
@@ -171,7 +171,6 @@ coll = COLLECT(
     name="64AllCollection",  # Replace with your project name
 )
 EOF
-
 
 echo "Creating the executable..."
 poetry run pyinstaller 64All.spec

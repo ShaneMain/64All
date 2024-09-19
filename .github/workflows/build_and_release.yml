@@ -13,7 +13,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: fedora:latest
+      image: fedora:35
 
     steps:
       - name: Checkout repository
@@ -36,8 +36,8 @@ jobs:
         shell: bash
         run: |
           source ~/.bashrc
-          pyenv install 3.10.0
-          pyenv virtualenv 3.10.0 venv-3.10.0
+          pyenv install 3.10.5
+          pyenv virtualenv 3.10.5 venv-3.10.5
 
       - name: Set up Poetry
         shell: bash
@@ -49,21 +49,21 @@ jobs:
         shell: bash
         run: |
           source ~/.bashrc
-          pyenv activate venv-3.10.0
+          pyenv activate venv-3.10.5
           poetry install --no-root
 
       - name: Install PyInstaller
         shell: bash
         run: |
           source ~/.bashrc
-          pyenv activate venv-3.10.0
+          pyenv activate venv-3.10.5
           pip install pyinstaller
 
       - name: Run build script
         shell: bash
         run: |
           source ~/.bashrc
-          pyenv activate venv-3.10.0
+          pyenv activate venv-3.10.5
           chmod +x ./scripts/build.sh
           ./scripts/build.sh
 
